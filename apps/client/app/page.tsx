@@ -15,9 +15,16 @@ export default function Home() {
   useEffect(() => {
     const savedId = localStorage.getItem("jones_game_id");
     if (savedId) {
-      loadGame(savedId).then((g) => {
-        if (g && g.status === "in_progress") setGame(g);
-      });
+      loadGame(savedId)
+        .then((g) => {
+          if (g && g.status === "in_progress") {
+            setGame(g);
+            setMessages(["Game resumed from last session."]);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to resume game:", err);
+        });
     }
   }, []);
 
