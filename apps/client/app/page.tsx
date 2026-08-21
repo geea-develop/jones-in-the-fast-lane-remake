@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { GameState } from "@jones/shared";
+import { GameState, GoalSelection, Difficulty, DIFFICULTY_GOALS } from "@jones/shared";
 import { createGame, loadGame } from "@/lib/api";
 import GameBoard from "@/components/GameBoard";
 
@@ -10,6 +10,13 @@ export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [gameId, setGameId] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
+  const [goalSelection, setGoalSelection] = useState<GoalSelection>({
+    money: true,
+    education: true,
+    career: true,
+    happiness: true,
+    difficulty: "medium",
+  });
 
   // Auto-resume on mount
   useEffect(() => {
@@ -33,7 +40,7 @@ export default function Home() {
   }
 
   async function handleNewGame() {
-    const g = await createGame({ playerName: playerName || "Player" });
+    const g = await createGame({ playerName: playerName || "Player", goalSelection });
     setGame(g);
     setMessages([]);
     localStorage.setItem("jones_game_id", g.id);
@@ -117,11 +124,53 @@ export default function Home() {
           onChange={(e) => setPlayerName(e.target.value)}
           className="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white"
         />
+
+        {/* Difficulty */}
+        <div className="text-left">
+          <label className="text-sm text-gray-400 block mb-1">Difficulty</label>
+          <div className="grid grid-cols-3 gap-2">
+            {(["easy", "medium", "hard"] as Difficulty[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setGoalSelection({ ...goalSelection, difficulty: d })}
+                className={`p-2 rounded border text-sm font-semibold capitalize ${
+                  goalSelection.difficulty === d
+                    ? "bg-blue-700 border-blue-500"
+                    : "bg-gray-800 border-gray-700 hover:border-gray-500"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Targets: 💰${DIFFICULTY_GOALS[goalSelection.difficulty].money} | 🎓{DIFFICULTY_GOALS[goalSelection.difficulty].education} | 💼{DIFFICULTY_GOALS[goalSelection.difficulty].career} | 😊{DIFFICULTY_GOALS[goalSelection.difficulty].happiness}
+          </p>
+        </div>
+
+        {/* Goal categories */}
+        <div className="text-left">
+          <label className="text-sm text-gray-400 block mb-1">Goals to pursue</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(["money", "education", "career", "happiness"] as const).map((g) => (
+              <label key={g} className="flex items-center gap-2 p-2 rounded bg-gray-800 border border-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={goalSelection[g]}
+                  onChange={() => setGoalSelection({ ...goalSelection, [g]: !goalSelection[g] })}
+                  className="accent-blue-500"
+                />
+                <span className="capitalize text-sm">{g}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <button
           onClick={handleNewGame}
           className="w-full p-3 rounded bg-blue-600 hover:bg-blue-700 font-semibold"
         >
-          New Game
+          Start Game
         </button>
 
         <div className="border-t border-gray-700 pt-4">

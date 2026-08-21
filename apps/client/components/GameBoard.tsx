@@ -61,8 +61,9 @@ export default function GameBoard({ game, onUpdate, onMessage }: GameBoardProps)
             <span>🎓 Education: <strong>{game.player.education}</strong> <span className="text-gray-500">({game.goals.education})</span></span>
             <span>💼 Career: <strong>{game.player.career}</strong> <span className="text-gray-500">({game.goals.career})</span></span>
             <span>😊 Happiness: <strong>{game.player.happiness}</strong> <span className="text-gray-500">({game.goals.happiness})</span></span>
-            <span>⚡ Energy: <strong>{game.player.energy}</strong></span>
-            <span>💼 Job: <strong>{game.player.job?.title || "None"}</strong></span>
+            <span>⚡ Energy: <strong className={game.player.energy < 20 ? "text-red-400" : ""}>{game.player.energy}</strong></span>
+            <span>🍔 Food: <strong className={game.player.food <= 25 ? "text-red-400" : ""}>{game.player.food}</strong></span>
+            <span>💼 Job: <strong>{game.player.job?.title || "Unemployed"}</strong>{game.player.job ? ` ($${game.player.job.salary})` : ""}</span>
           </div>
         </div>
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 opacity-70">
@@ -72,6 +73,7 @@ export default function GameBoard({ game, onUpdate, onMessage }: GameBoardProps)
             <span>🎓 {game.aiJones.education}</span>
             <span>💼 {game.aiJones.career}</span>
             <span>😊 {game.aiJones.happiness}</span>
+            <span>💼 {game.aiJones.job?.title || "Unemployed"}</span>
           </div>
         </div>
       </div>

@@ -4,10 +4,13 @@ import {
   GameState,
   Player,
   DEFAULT_GOALS,
+  DEFAULT_GOAL_SELECTION,
+  DIFFICULTY_GOALS,
   TIME_UNITS_PER_WEEK,
   CreateGameRequest,
   MoveRequest,
   ActionRequest,
+  GoalSelection,
 } from "@jones/shared";
 import { saveGame, loadGame } from "../store.js";
 import { movePlayer, performAction, endWeek } from "../engine.js";
@@ -24,15 +27,20 @@ function createPlayer(id: string, name: string): Player {
     career: 0,
     happiness: 50,
     energy: 100,
+    food: 80,
     timeUnits: TIME_UNITS_PER_WEEK,
     position: "home",
     job: null,
+    turnsEmployed: 0,
   };
 }
 
 // POST / — create new game
 gameRouter.post("/", async (req: Request, res: Response) => {
-  const { playerName, goals } = req.body as CreateGameRequest;
+  const { playerName, goalSelection } = req.body as CreateGameRequest;
+
+  const sel: GoalSelection = goalSelection || DEFAULT_GOAL_SELECTION;
+  const goals = DIFFICULTY_GOALS[sel.difficulty] || DEFAULT_GOALS;
 
   const gameId = uuid();
   const game: GameState = {
@@ -40,8 +48,10 @@ gameRouter.post("/", async (req: Request, res: Response) => {
     player: createPlayer(uuid(), playerName || "Player"),
     aiJones: createPlayer("jones", "Jones"),
     week: 1,
-    goals: { ...DEFAULT_GOALS, ...goals },
+    goals,
+    goalSelection: sel,
     status: "in_progress",
+    lastEvent: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

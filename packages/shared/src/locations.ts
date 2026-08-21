@@ -79,11 +79,11 @@ export const LOCATIONS: Location[] = [
 
 export const ACTIONS: Action[] = [
   { id: "study", name: "Study", timeCost: 3, description: "Gain education points" },
-  { id: "browse_jobs", name: "Browse Jobs", timeCost: 1, description: "See available jobs" },
+  { id: "browse_jobs", name: "Browse Jobs", timeCost: 1, description: "See available jobs and apply" },
   { id: "work", name: "Work", timeCost: 4, description: "Earn money at your job" },
-  { id: "buy_food", name: "Buy Food", timeCost: 1, moneyCost: 10, description: "Buy food to stay alive" },
-  { id: "buy_item", name: "Buy Item", timeCost: 1, description: "Buy useful items" },
-  { id: "pay_rent", name: "Pay Rent", timeCost: 1, moneyCost: 50, description: "Pay weekly rent" },
-  { id: "have_fun", name: "Have Fun", timeCost: 2, moneyCost: 20, description: "Increase happiness" },
+  { id: "buy_food", name: "Buy Food ($15)", timeCost: 1, moneyCost: 15, description: "Buy groceries (+40 food)" },
+  { id: "buy_item", name: "Buy Item ($50)", timeCost: 1, moneyCost: 50, description: "Buy something nice (+10 happiness)" },
+  { id: "pay_rent", name: "Pay Rent ($50)", timeCost: 1, moneyCost: 50, description: "Pay weekly rent" },
+  { id: "have_fun", name: "Have Fun ($20)", timeCost: 2, moneyCost: 20, description: "Increase happiness" },
   { id: "rest", name: "Rest", timeCost: 2, description: "Recover energy" },
 ];

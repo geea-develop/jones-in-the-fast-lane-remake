@@ -1,10 +1,10 @@
-import { GameState, Goals } from "./game.js";
+import { GameState, GoalSelection } from "./game.js";
 import { ActionId, LocationId } from "./locations.js";
 
 // POST /api/game — create new game
 export interface CreateGameRequest {
   playerName: string;
-  goals?: Partial<Goals>;
+  goalSelection?: GoalSelection;
 }
 
 export interface CreateGameResponse {
@@ -33,6 +33,6 @@ export interface EndWeekResponse {
 }
 
 export interface GameEvent {
-  type: "rent_due" | "fired" | "promotion" | "week_start" | "goal_reached" | "game_over";
+  type: "rent_due" | "fired" | "promotion" | "week_start" | "goal_reached" | "game_over" | "hunger" | "random_event" | "starving";
   message: string;
 }
