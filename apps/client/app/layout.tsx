@@ -31,17 +31,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-gray-900 text-white min-h-screen">
         {children}
-        <footer className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-2 z-10">
+        <footer className="fixed bottom-2 right-3 flex items-center gap-2 z-10 opacity-50 hover:opacity-100 transition-opacity">
           <a
             href="https://github.com/geea-develop/jones-in-the-fast-lane-remake/issues/new"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-gray-500 hover:text-gray-300 text-xs underline"
+            className="text-gray-500 hover:text-gray-300 text-[10px] underline"
           >
             Report Bug
           </a>
           <span className="text-gray-700 text-[10px]">
-            build {buildId} 🏃
+            {buildId} 🏃
           </span>
         </footer>
         <script

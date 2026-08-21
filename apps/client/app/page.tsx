@@ -20,7 +20,7 @@ export default function Home() {
 
   // Auto-resume on mount
   useEffect(() => {
-    const savedId = localStorage.getItem("jones_game_id");
+    const savedId = sessionStorage.getItem("jones_game_id");
     if (savedId) {
       loadGame(savedId)
         .then((g) => {
@@ -43,11 +43,11 @@ export default function Home() {
     const g = await createGame({ playerName: playerName || "Player", goalSelection });
     setGame(g);
     setMessages([]);
-    localStorage.setItem("jones_game_id", g.id);
+    sessionStorage.setItem("jones_game_id", g.id);
   }
 
   async function handleResume() {
-    const id = gameId || localStorage.getItem("jones_game_id");
+    const id = gameId || sessionStorage.getItem("jones_game_id");
     if (!id) return;
     const g = await loadGame(id);
     if (g) {
@@ -82,7 +82,7 @@ export default function Home() {
           </div>
         </div>
         <button
-          onClick={() => { setGame(null); localStorage.removeItem("jones_game_id"); }}
+          onClick={() => { setGame(null); sessionStorage.removeItem("jones_game_id"); }}
           className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded font-semibold"
         >
           Play Again

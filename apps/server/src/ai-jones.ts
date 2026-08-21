@@ -8,6 +8,7 @@ import {
   WEEKLY_RENT,
   FOOD_DECAY_PER_WEEK,
   HUNGER_ENERGY_PENALTY,
+  getMovementCost,
 } from "@jones/shared";
 import { GameEvent } from "@jones/shared";
 import { checkWin } from "./engine.js";
@@ -46,9 +47,10 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
 
     // Move if needed
     if (jones.position !== targetLocation) {
-      if (jones.timeUnits < 1) break;
+      const moveCost = getMovementCost(jones.position, targetLocation);
+      if (jones.timeUnits < moveCost) break;
       jones.position = targetLocation;
-      jones.timeUnits -= 1;
+      jones.timeUnits -= moveCost;
     }
 
     const actionDef = ACTIONS.find((a) => a.id === action);
@@ -56,13 +58,16 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
     if (actionDef.moneyCost && jones.money < actionDef.moneyCost) {
       // Need money — go work if possible
       if (jones.job && jones.timeUnits >= 5) {
-        jones.position = "workplace";
-        jones.timeUnits -= 1;
-        jones.money += jones.job.salary;
-        jones.timeUnits -= 4;
-        jones.energy = Math.max(0, jones.energy - 20);
-        jones.career = Math.min(100, jones.career + jones.job.careerGain);
-        continue;
+        const workMoveCost = getMovementCost(jones.position, "workplace");
+        if (jones.timeUnits >= workMoveCost + 4) {
+          jones.position = "workplace";
+          jones.timeUnits -= workMoveCost;
+          jones.money += jones.job.salary;
+          jones.timeUnits -= 4;
+          jones.energy = Math.max(0, jones.energy - 20);
+          jones.career = Math.min(100, jones.career + jones.job.careerGain);
+          continue;
+        }
       }
       break;
     }
@@ -202,10 +207,15 @@ function getLocationForAction(action: ActionId): LocationId {
     case "study": return "university";
     case "browse_jobs": return "employment_office";
     case "work": return "workplace";
-    case "buy_food":
+    case "buy_food": return "store";
     case "buy_item": return "store";
+    case "buy_clothes": return "clothing_store";
+    case "buy_electronics": return "electronics";
     case "pay_rent": return "rent_office";
     case "have_fun": return "entertainment";
     case "rest": return "home";
+    case "pawn_item": return "pawn_shop";
+    case "deposit":
+    case "withdraw": return "bank";
   }
 }

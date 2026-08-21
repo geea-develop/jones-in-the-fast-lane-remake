@@ -11,11 +11,9 @@ import {
   FOOD_DECAY_PER_WEEK,
   HUNGER_ENERGY_PENALTY,
   LOW_ENERGY_FIRE_THRESHOLD,
+  getMovementCost,
 } from "@jones/shared";
 import { GameEvent } from "@jones/shared";
-
-// Movement cost: 1 time unit to move to any location (simplified for v1)
-const MOVE_COST = 1;
 
 export function movePlayer(game: GameState, location: LocationId): { game: GameState; error?: string } {
   const player = game.player;
@@ -24,11 +22,13 @@ export function movePlayer(game: GameState, location: LocationId): { game: GameS
     return { game, error: "Already at this location" };
   }
 
-  if (player.timeUnits < MOVE_COST) {
-    return { game, error: "Not enough time to move" };
+  const cost = getMovementCost(player.position, location);
+
+  if (player.timeUnits < cost) {
+    return { game, error: `Not enough time to move (need ${cost}, have ${player.timeUnits})` };
   }
 
-  player.timeUnits -= MOVE_COST;
+  player.timeUnits -= cost;
   player.position = location;
 
   return { game };
@@ -148,6 +148,36 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
       player.energy = Math.min(100, player.energy + restGain);
       player.happiness = Math.max(0, player.happiness - 3); // resting is boring
       message = `Rested well. Energy +${restGain} (now ${player.energy})`;
+      break;
+    }
+
+    case "buy_clothes": {
+      player.happiness = Math.min(100, player.happiness + 8);
+      message = "Bought a sharp new outfit! Happiness +8";
+      break;
+    }
+
+    case "buy_electronics": {
+      player.happiness = Math.min(100, player.happiness + 15);
+      message = "Bought some sweet electronics! Happiness +15";
+      break;
+    }
+
+    case "pawn_item": {
+      player.money += 25;
+      player.happiness = Math.max(0, player.happiness - 5);
+      message = "Pawned some belongings. +$25, Happiness -5";
+      break;
+    }
+
+    case "deposit": {
+      // Simplified: no separate bank balance for now
+      message = "Money deposited safely.";
+      break;
+    }
+
+    case "withdraw": {
+      message = "Withdrew money from the bank.";
       break;
     }
   }
