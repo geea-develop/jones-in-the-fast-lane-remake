@@ -47,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           type="module"
           src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "CLOUDFLARE_TOKEN_HERE"}'
+          data-cf-beacon='{"token": "136e08eeda5c4767885f149528781334"}'
         />
       </body>
     </html>
