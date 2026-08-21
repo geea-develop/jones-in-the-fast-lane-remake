@@ -1,6 +1,6 @@
 import { GameState, CreateGameRequest, LocationId, ActionId, GameEvent } from "@jones/shared";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://jones-server.onrender.com";
 
 export async function createGame(req: CreateGameRequest): Promise<GameState> {
   const res = await fetch(`${API_URL}/api/game`, {
