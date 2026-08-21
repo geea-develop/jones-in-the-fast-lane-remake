@@ -6,8 +6,6 @@ A modern remake of the classic 1991 Sierra DOS game "Jones in the Fast Lane".
 
 🚧 Planning & Context Collection
 
-> ⚠️ **Private until cleared** — Do not make public until reviewed for security issues and hardcoded paths.
-
 ## References
 
 - Original game: [Jones in the Fast Lane (Wikipedia)](https://en.wikipedia.org/wiki/Jones_in_the_Fast_Lane)
