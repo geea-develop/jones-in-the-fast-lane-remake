@@ -1,0 +1,22 @@
+{
+  "name": "jones-in-the-fast-lane-remake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A modern remake of Jones in the Fast Lane (Sierra, 1991)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:client",
+    "dev:server": "npm run dev --workspace=@jones/server",
+    "dev:client": "npm run dev --workspace=@jones/client",
+    "build": "npm run build --workspace=@jones/shared && npm run build --workspace=@jones/server && npm run build --workspace=@jones/client",
+    "build:shared": "npm run build --workspace=@jones/shared",
+    "build:server": "npm run build --workspace=@jones/server",
+    "build:client": "npm run build --workspace=@jones/client"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
