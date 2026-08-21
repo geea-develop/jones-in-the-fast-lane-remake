@@ -179,8 +179,8 @@ export function getMovementCost(from: LocationId, to: LocationId): number {
   const clockwise = (toPos - fromPos + BOARD_SIZE) % BOARD_SIZE;
   const counterClockwise = (fromPos - toPos + BOARD_SIZE) % BOARD_SIZE;
   const distance = Math.min(clockwise, counterClockwise);
-  // 1 hour per step
-  return distance;
+  // Half hour per step, minimum 1 hour for any move
+  return Math.max(1, Math.ceil(distance * 0.5));
 }
 
 export const ACTIONS: Action[] = [

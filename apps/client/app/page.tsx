@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { GameState, GoalSelection, Difficulty, DIFFICULTY_GOALS } from "@jones/shared";
 import { createGame, loadGame } from "@/lib/api";
 import GameBoard from "@/components/GameBoard";
@@ -20,24 +20,26 @@ export default function Home() {
 
   // Auto-resume on mount
   useEffect(() => {
+    let cancelled = false;
     const savedId = sessionStorage.getItem("jones_game_id");
     if (savedId) {
       loadGame(savedId)
         .then((g) => {
-          if (g && g.status === "in_progress") {
+          if (!cancelled && g && g.status === "in_progress") {
             setGame(g);
             setMessages(["Game resumed from last session."]);
           }
         })
         .catch((err) => {
-          console.error("Failed to resume game:", err);
+          if (!cancelled) console.error("Failed to resume game:", err);
         });
     }
+    return () => { cancelled = true; };
   }, []);
 
-  function addMessage(msg: string) {
+  const addMessage = useCallback((msg: string) => {
     setMessages((prev) => [msg, ...prev].slice(0, 20));
-  }
+  }, []);
 
   async function handleNewGame() {
     const g = await createGame({ playerName: playerName || "Player", goalSelection });
@@ -57,6 +59,12 @@ export default function Home() {
       addMessage("❌ Game not found");
     }
   }
+
+  const handleRestart = useCallback(() => {
+    setGame(null);
+    setMessages([]);
+    sessionStorage.removeItem("jones_game_id");
+  }, []);
 
   // Game Over screen
   if (game && game.status !== "in_progress") {
@@ -96,7 +104,7 @@ export default function Home() {
     return (
       <main className="max-w-5xl mx-auto p-6">
         <h1 className="text-2xl font-bold mb-4">🏃 Jones in the Fast Lane</h1>
-        <GameBoard game={game} onUpdate={setGame} onMessage={addMessage} />
+        <GameBoard game={game} onUpdate={setGame} onMessage={addMessage} onRestart={handleRestart} />
 
         {/* Message Log */}
         <div className="mt-6 bg-gray-800 rounded-lg p-4 border border-gray-700 max-h-40 overflow-y-auto">

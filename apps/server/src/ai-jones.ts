@@ -16,8 +16,8 @@ import { checkWin } from "./engine.js";
 type JonesStrategy = "balanced" | "career_rush" | "education_first" | "money_grind";
 
 /**
- * Improved AI Jones — picks a strategy at game start and adapts based on state.
- * Manages hunger, energy, and priorities more intelligently.
+ * AI Jones — competitive opponent that adapts strategy based on game state.
+ * Properly manages survival (food, energy, happiness) while racing toward goals.
  */
 export function runJonesTurn(game: GameState): { game: GameState; events: GameEvent[] } {
   const events: GameEvent[] = [];
@@ -56,20 +56,8 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
     const actionDef = ACTIONS.find((a) => a.id === action);
     if (!actionDef || jones.timeUnits < actionDef.timeCost) break;
     if (actionDef.moneyCost && jones.money < actionDef.moneyCost) {
-      // Need money — go work if possible
-      if (jones.job && jones.timeUnits >= 5) {
-        const workMoveCost = getMovementCost(jones.position, "workplace");
-        if (jones.timeUnits >= workMoveCost + 4) {
-          jones.position = "workplace";
-          jones.timeUnits -= workMoveCost;
-          jones.money += jones.job.salary;
-          jones.timeUnits -= 4;
-          jones.energy = Math.max(0, jones.energy - 20);
-          jones.career = Math.min(100, jones.career + jones.job.careerGain);
-          continue;
-        }
-      }
-      break;
+      // Can't afford — skip and try something else
+      continue;
     }
 
     // Execute
@@ -103,6 +91,12 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
         jones.happiness = Math.min(100, jones.happiness + 18 + Math.floor(Math.random() * 8));
         jones.energy = Math.max(0, jones.energy - 5);
         break;
+      case "buy_clothes":
+        jones.happiness = Math.min(100, jones.happiness + 8);
+        break;
+      case "buy_electronics":
+        jones.happiness = Math.min(100, jones.happiness + 15);
+        break;
       case "rest":
         jones.energy = Math.min(100, jones.energy + 35 + Math.floor(Math.random() * 15));
         break;
@@ -131,58 +125,103 @@ function pickStrategy(game: GameState): JonesStrategy {
   const jones = game.aiJones;
   const week = game.week;
 
-  // Early game: focus on education to unlock better jobs
-  if (week <= 4 && jones.education < 30) return "education_first";
+  // Early game: education is the unlock for everything
+  if (week <= 6 && jones.education < 40) return "education_first";
 
-  // If no job or bad job, focus on career path
-  if (!jones.job || jones.job.salary < 45) return "career_rush";
+  // If no job or a bad job and have enough education for better, go get it
+  if (shouldUpgradeJob(jones)) return "career_rush";
 
-  // Mid-game: grind money if far from goal
-  if (jones.money < game.goals.money * 0.5) return "money_grind";
+  // If we have a decent job, figure out what we need most
+  const gaps = getGoalGaps(game);
+  const maxGap = Math.max(gaps.education, gaps.career, gaps.happiness, gaps.money);
 
-  // Default: balanced approach
+  if (maxGap === gaps.money && jones.job) return "money_grind";
+  if (maxGap === gaps.education) return "education_first";
+  if (maxGap === gaps.career) return "career_rush";
+
   return "balanced";
+}
+
+function getGoalGaps(game: GameState) {
+  const jones = game.aiJones;
+  const goals = game.goals;
+  return {
+    education: Math.max(0, goals.education - jones.education) / goals.education,
+    career: Math.max(0, goals.career - jones.career) / goals.career,
+    happiness: Math.max(0, goals.happiness - jones.happiness) / goals.happiness,
+    money: Math.max(0, goals.money - jones.money) / goals.money,
+  };
 }
 
 function chooseAction(game: GameState, strategy: JonesStrategy): ActionId | null {
   const jones = game.aiJones;
 
-  // Survival priorities (always take precedence)
-  if (jones.food <= 20 && jones.money >= 15) return "buy_food";
-  if (jones.energy < 20) return "rest";
+  // === SURVIVAL (always top priority) ===
+  // Buy food proactively — don't wait until starving
+  if (jones.food <= 40 && jones.money >= 15) return "buy_food";
+  // Rest when tired
+  if (jones.energy < 30) return "rest";
+  // Need happiness to avoid spiral
+  if (jones.happiness < 20) {
+    if (jones.money >= 40) return "buy_clothes";
+    return "have_fun";
+  }
+
+  // === INCOME — always make sure we have a job ===
   if (!jones.job) return "browse_jobs";
 
-  // Strategy-specific choices
+  // === Work to build money buffer if broke (need rent + food money) ===
+  if (jones.money < 40 && jones.job) return "work";
+
+  // === STRATEGY-SPECIFIC ===
   switch (strategy) {
     case "education_first":
-      if (jones.education < 60) return "study";
-      return "browse_jobs";
+      if (jones.education < game.goals.education) return "study";
+      // Education goal met, check if we can upgrade job
+      if (shouldUpgradeJob(jones)) return "browse_jobs";
+      return "work";
 
     case "career_rush":
+      // Get education needed for next job
       if (jones.education < getNextJobRequirement(jones)) return "study";
+      // Upgrade job
       if (shouldUpgradeJob(jones)) return "browse_jobs";
+      // Work to build career points
       return jones.job ? "work" : "browse_jobs";
 
     case "money_grind":
-      if (jones.happiness < 25) return "have_fun";
+      // Just work as much as possible
+      if (jones.happiness < 35) return "have_fun";
       return jones.job ? "work" : "browse_jobs";
 
     case "balanced": {
-      const gaps = {
-        education: game.goals.education - jones.education,
-        career: game.goals.career - jones.career,
-        happiness: game.goals.happiness - jones.happiness,
-        money: game.goals.money - jones.money,
-      };
+      const gaps = getGoalGaps(game);
 
-      const sorted = Object.entries(gaps).sort((a, b) => b[1] - a[1]);
-      const [topNeed] = sorted[0];
+      // Find biggest gap and address it
+      const priorities: [string, number][] = [
+        ["education", gaps.education],
+        ["career", gaps.career],
+        ["happiness", gaps.happiness],
+        ["money", gaps.money],
+      ].filter(([_, v]) => (v as number) > 0) as [string, number][];
+
+      priorities.sort((a, b) => b[1] - a[1]);
+
+      if (priorities.length === 0) return "work"; // All goals met? keep working
+
+      const [topNeed] = priorities[0];
 
       switch (topNeed) {
         case "education": return "study";
-        case "career": return jones.job ? "work" : "browse_jobs";
-        case "happiness": return jones.money >= 20 ? "have_fun" : "work";
-        case "money": return jones.job ? "work" : "browse_jobs";
+        case "career":
+          if (shouldUpgradeJob(jones)) return "browse_jobs";
+          return jones.job ? "work" : "browse_jobs";
+        case "happiness":
+          if (jones.money >= 80) return "buy_electronics";
+          if (jones.money >= 40) return "buy_clothes";
+          return "have_fun";
+        case "money":
+          return jones.job ? "work" : "browse_jobs";
       }
     }
   }
@@ -190,7 +229,7 @@ function chooseAction(game: GameState, strategy: JonesStrategy): ActionId | null
   return "work";
 }
 
-function getNextJobRequirement(jones: typeof JOBS extends (infer T)[] ? { education: number; job: typeof JOBS[0] | null } : never): number {
+function getNextJobRequirement(jones: { education: number; job: typeof JOBS[0] | null }): number {
   const currentSalary = jones.job?.salary || 0;
   const nextJob = JOBS.find((j) => j.salary > currentSalary);
   return nextJob?.educationRequired || 100;
