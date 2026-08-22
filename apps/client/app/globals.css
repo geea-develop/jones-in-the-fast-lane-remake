@@ -48,24 +48,32 @@
   html { background: #101a2c; }
   body { background: radial-gradient(circle at 50% -10%, #263b5d 0, #101a2c 58%); color: #f7f0d3; font-family: "Courier New", ui-monospace, monospace; }
   .game-shell { width: min(1480px, calc(100vw - 40px)); margin: 0 auto; padding: 18px 0 30px; }
-  .board-window { aspect-ratio: 4 / 3; min-height: 420px; border: 3px solid #7184ac; border-radius: 7px; overflow: hidden; background: #356849; box-shadow: inset 0 0 0 2px #17253d, 5px 5px 0 rgba(0,0,0,.38); }
+  .board-window { position: relative; z-index: 10; aspect-ratio: 4 / 3; min-height: 420px; border: 3px solid #7184ac; border-radius: 7px; overflow: visible; background: #356849; box-shadow: inset 0 0 0 2px #17253d, 5px 5px 0 rgba(0,0,0,.38); }
   .board-window > div { min-height: 100%; }
   .hud-panel { background: linear-gradient(145deg, rgba(36,49,81,.98), rgba(25,34,58,.98)); }
   .action-panel { background: linear-gradient(145deg, rgba(32,44,73,.98), rgba(24,32,54,.98)); }
   .location-icon-frame { display: grid; place-items: center; width: 68px; height: 60px; }
   .location-icon-frame img { width: 64px; height: 64px; }
-  .metric-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; border: 1px solid currentColor; border-radius: 3px; font: 700 9px/1 "Courier New", monospace; }
+  .metric-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; margin-right: .25rem; vertical-align: middle; transform: translateY(-1px); border: 1px solid currentColor; border-radius: 3px; font: 700 9px/1 "Courier New", monospace; }
   .game-dialog { animation: dialog-in .14s ease-out both; }
   @keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .location-popover { opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; }
   .retro-tile:hover .location-popover, .retro-tile:focus-visible .location-popover { opacity: 1; transform: translateY(0); }
+  .retro-tile.popover-right .location-popover { left: 100%; transform: translate(0, 4px); }
+  .retro-tile.popover-left .location-popover { left: auto; right: 100%; transform: translate(0, 4px); }
+  .retro-tile.popover-up .location-popover { top: auto; bottom: 100%; margin-top: 0; margin-bottom: .5rem; transform: translate(0, 4px); }
+  .retro-tile.popover-right:hover .location-popover, .retro-tile.popover-right:focus-visible .location-popover,
+  .retro-tile.popover-left:hover .location-popover, .retro-tile.popover-left:focus-visible .location-popover,
+  .retro-tile.popover-up:hover .location-popover, .retro-tile.popover-up:focus-visible .location-popover { transform: translate(0, 0); }
   @media (max-width: 1279px) { .game-shell { width: min(100% - 24px, 1080px); padding-top: 12px; } }
   @media (max-width: 900px) { .game-shell { width: min(100% - 20px, 680px); padding-top: 10px; } }
 
   /* Retro tile hover glow */
   .retro-tile {
+    z-index: 1;
     transition: all 0.15s ease;
   }
+  .retro-tile:hover, .retro-tile:focus-visible { z-index: 40; }
   .retro-tile:not(:disabled):hover {
     box-shadow: 0 0 12px rgba(0, 255, 100, 0.4), inset 0 0 6px rgba(0, 255, 100, 0.1);
   }

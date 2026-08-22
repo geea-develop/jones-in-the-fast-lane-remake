@@ -216,6 +216,7 @@ export default function Home() {
           </button>
         </div>
       </div>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }

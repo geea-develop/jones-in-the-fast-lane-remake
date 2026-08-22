@@ -106,8 +106,11 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
         <div className="retro-panel flex items-center justify-between px-4 py-2.5">
           <span className="pixel-text text-[9px] text-amber-400">WK {game.week}</span>
           <span className="text-sm font-mono"><span className="metric-icon text-cyan-300">TIME</span> <strong className="text-cyan-300">{game.player.timeUnits}</strong>h</span>
-          <span className="text-xs truncate max-w-[180px] text-gray-300">
-            <span className="metric-icon text-amber-300">JOB</span> {game.player.job?.title || "Unemployed"}{game.player.job ? ` ($${game.player.job.salary})` : ""}
+          <span className="flex min-w-0 max-w-[220px] items-center gap-1 text-xs text-gray-300">
+            <span className="metric-icon shrink-0 text-amber-300">JOB</span>
+            <span className="min-w-0 truncate">
+              {game.player.job?.title || "Unemployed"}{game.player.job ? ` ($${game.player.job.salary})` : ""}
+            </span>
           </span>
           <div className="flex gap-2">
             <button
@@ -369,7 +372,7 @@ const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMov
       {/* Left column */}
       <div className="row-span-1 flex flex-col gap-2 justify-around">
         {left.map((loc) => (
-          <Tile key={loc.id} loc={loc} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
+          <Tile key={loc.id} loc={loc} popoverSide="right" popoverDirection={loc.id === "market" ? "up" : undefined} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
         ))}
       </div>
 
@@ -381,7 +384,7 @@ const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMov
       {/* Right column */}
       <div className="row-span-1 flex flex-col gap-2 justify-around">
         {right.map((loc) => (
-          <Tile key={loc.id} loc={loc} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
+          <Tile key={loc.id} loc={loc} popoverSide="left" playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
         ))}
       </div>
 
@@ -440,8 +443,10 @@ const CenterStats = memo(function CenterStats({ player }: { player: GameState["p
 // Tile — with pixel icon and color-coded cost
 // ──────────────────────────────────────────────────
 
-const Tile = memo(function Tile({ loc, playerPosition, jonesPosition, onMove, timeUnits }: {
+const Tile = memo(function Tile({ loc, popoverSide, popoverDirection, playerPosition, jonesPosition, onMove, timeUnits }: {
   loc: typeof LOCATIONS[0];
+  popoverSide?: "left" | "right";
+  popoverDirection?: "up";
   playerPosition: LocationId;
   jonesPosition: LocationId;
   onMove: (id: LocationId) => void;
@@ -461,7 +466,7 @@ const Tile = memo(function Tile({ loc, playerPosition, jonesPosition, onMove, ti
     <button
       onClick={handleClick}
       disabled={!canMove}
-      className={`retro-tile relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all duration-150 ${
+      className={`retro-tile ${popoverSide ? `popover-${popoverSide}` : ""} ${popoverDirection ? `popover-${popoverDirection}` : ""} relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all duration-150 ${
         isHere
           ? "border-cyan-400 bg-cyan-900/50 ring-2 ring-cyan-400/30 scale-[1.03]"
           : canMove
