@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,11 +6,19 @@ export const metadata: Metadata = {
   description: "A modern remake of the classic 1991 Sierra DOS game",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#101a2c",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const buildId = process.env.NEXT_PUBLIC_BUILD_ID?.slice(0, 7) || "local";
   const serverUrl = process.env.NEXT_PUBLIC_API_URL || "https://jones-server.onrender.com";
 
   const isDev = process.env.NODE_ENV === "development";
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
   const csp = [
     "default-src 'self'",
@@ -28,6 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head>
         <meta httpEquiv="Content-Security-Policy" content={csp} />
+        <link rel="manifest" href={`${basePath}/manifest.webmanifest`} />
+        <link rel="apple-touch-icon" href={`${basePath}/icon-192.png`} />
       </head>
       <body className="bg-gray-900 text-white min-h-screen">
         {children}

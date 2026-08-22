@@ -5,6 +5,7 @@ import { GameState, GoalSelection, Difficulty, DIFFICULTY_GOALS } from "@jones/s
 import { createGame, loadGame } from "@/lib/api";
 import GameBoard from "@/components/GameBoard";
 import { useToasts, ToastContainer } from "@/components/Toast";
+import { assetPath } from "@/lib/assets";
 
 export default function Home() {
   const [game, setGame] = useState<GameState | null>(null);
@@ -48,10 +49,14 @@ export default function Home() {
   }, [addToast]);
 
   async function handleNewGame() {
-    const g = await createGame({ playerName: playerName || "Player", goalSelection });
-    setGame(g);
-    sessionStorage.setItem("jones_game_id", g.id);
-    addToast("New game started! Good luck!", "success");
+    try {
+      const g = await createGame({ playerName: playerName || "Player", goalSelection });
+      setGame(g);
+      sessionStorage.setItem("jones_game_id", g.id);
+      addToast("New game started! Good luck!", "success");
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Could not start the game. Please try again.", "error");
+    }
   }
 
   async function handleResume() {
@@ -79,11 +84,11 @@ export default function Home() {
         {/* Winner/Loser character display */}
         <div className="flex items-end justify-center gap-8 mb-6">
           <div className={`flex flex-col items-center ${won ? "scale-110" : "opacity-60 scale-90"}`}>
-            <img src="/assets/characters/player.png" alt="Player" className="w-20 h-36 object-contain" style={{ imageRendering: "pixelated" }} />
+            <img src={assetPath("assets/characters/player.png")} alt="Player" className="w-20 h-36 object-contain" style={{ imageRendering: "pixelated" }} />
             <span className="pixel-text text-[8px] text-cyan-400 mt-1">{game.player.name.toUpperCase()}</span>
           </div>
           <div className={`flex flex-col items-center ${!won ? "scale-110" : "opacity-60 scale-90"}`}>
-            <img src="/assets/characters/jones.png" alt="Jones" className="w-20 h-36 object-contain" style={{ imageRendering: "pixelated" }} />
+            <img src={assetPath("assets/characters/jones.png")} alt="Jones" className="w-20 h-36 object-contain" style={{ imageRendering: "pixelated" }} />
             <span className="pixel-text text-[8px] text-red-400 mt-1">JONES</span>
           </div>
         </div>
@@ -134,12 +139,12 @@ export default function Home() {
     <main className="max-w-lg mx-auto p-8 text-center">
       {/* Title with character art */}
       <div className="flex items-end justify-center gap-6 mb-4">
-        <img src="/assets/characters/player.png" alt="Player" className="w-16 h-28 object-contain" style={{ imageRendering: "pixelated" }} />
+        <img src={assetPath("assets/characters/player.png")} alt="Player" className="w-16 h-28 object-contain" style={{ imageRendering: "pixelated" }} />
         <div>
           <h1 className="pixel-text text-xl text-amber-400 leading-relaxed">JONES IN THE<br/>FAST LANE</h1>
           <p className="text-gray-400 text-sm mt-2">Race to your life goals before Jones does!</p>
         </div>
-        <img src="/assets/characters/jones.png" alt="Jones" className="w-16 h-28 object-contain" style={{ imageRendering: "pixelated" }} />
+        <img src={assetPath("assets/characters/jones.png")} alt="Jones" className="w-16 h-28 object-contain" style={{ imageRendering: "pixelated" }} />
       </div>
 
       <div className="space-y-4">

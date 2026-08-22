@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { LocationId } from "@jones/shared";
+import { assetPath } from "@/lib/assets";
 
 /**
  * Location icons using AI-generated pixel-art building assets.
@@ -33,7 +34,7 @@ export const LocationIcon = memo(function LocationIcon({ locationId, size = 32 }
 
   return (
     <img
-      src={`/assets/buildings/${asset}`}
+      src={assetPath(`assets/buildings/${asset}`)}
       alt={locationId.replace(/_/g, " ")}
       width={size}
       height={size}

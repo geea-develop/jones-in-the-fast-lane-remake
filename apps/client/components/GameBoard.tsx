@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost, GameEvent } from "@jones/shared";
 import { moveToLocation, performAction, endWeek } from "@/lib/api";
 import { LocationIcon } from "./LocationIcons";
+import { assetPath } from "@/lib/assets";
 import { GameDialog } from "./GameDialog";
 import { playSound } from "@/lib/sounds";
 
@@ -103,16 +104,16 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
       {/* LEFT — Board + Actions */}
       <div className="flex flex-col gap-3 min-h-0">
         {/* Week bar — retro header */}
-        <div className="retro-panel flex items-center justify-between px-4 py-2.5">
+        <div className="retro-panel flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
           <span className="pixel-text text-[9px] text-amber-400">WK {game.week}</span>
           <span className="text-sm font-mono"><span className="metric-icon text-cyan-300">TIME</span> <strong className="text-cyan-300">{game.player.timeUnits}</strong>h</span>
-          <span className="flex min-w-0 max-w-[220px] items-center gap-1 text-xs text-gray-300">
+          <span className="flex min-w-0 max-w-[180px] items-center gap-1 text-xs text-gray-300 sm:max-w-[220px]">
             <span className="metric-icon shrink-0 text-amber-300">JOB</span>
             <span className="min-w-0 truncate">
               {game.player.job?.title || "Unemployed"}{game.player.job ? ` ($${game.player.job.salary})` : ""}
             </span>
           </span>
-          <div className="flex gap-2">
+            <div className="ml-auto flex gap-2">
             <button
               onClick={handleEndWeek}
               disabled={isSubmitting}
@@ -360,7 +361,7 @@ const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMov
 
   return (
     <div className="w-full h-full grid grid-rows-[auto_1fr_auto] grid-cols-[auto_1fr_auto] gap-2 p-2"
-      style={{ backgroundImage: "url(/assets/board-bg.png)", backgroundSize: "cover", backgroundPosition: "center", borderRadius: "8px" }}
+      style={{ backgroundImage: `url(${assetPath("assets/board-bg.png")})`, backgroundSize: "cover", backgroundPosition: "center", borderRadius: "8px" }}
     >
       {/* Top row */}
       <div className="col-span-3 grid grid-cols-4 gap-2">
@@ -404,14 +405,14 @@ const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMov
 
 const CenterStats = memo(function CenterStats({ player }: { player: GameState["player"]; goals: GameState["goals"] }) {
   return (
-    <div className="retro-panel p-4 flex flex-col items-center gap-3 min-w-[200px]">
+    <div className="retro-panel flex min-w-0 flex-col items-center gap-1 p-2 sm:min-w-[200px] sm:gap-3 sm:p-4">
       {/* Character portrait */}
-      <div className="flex items-end gap-4">
+      <div className="flex items-end gap-1 sm:gap-4">
         <div className="flex flex-col items-center">
           <img
-            src="/assets/characters/player.png"
+            src={assetPath("assets/characters/player.png")}
             alt="Player"
-            className="w-14 h-24 object-contain drop-shadow-[0_0_6px_rgba(0,255,255,0.5)]"
+            className="h-16 w-10 object-contain drop-shadow-[0_0_6px_rgba(0,255,255,0.5)] sm:h-24 sm:w-14"
             style={{ imageRendering: "pixelated" }}
           />
           <span className="pixel-text text-[7px] text-cyan-400 mt-1">YOU</span>
@@ -419,9 +420,9 @@ const CenterStats = memo(function CenterStats({ player }: { player: GameState["p
         <span className="pixel-text text-[8px] text-gray-500 pb-6">VS</span>
         <div className="flex flex-col items-center">
           <img
-            src="/assets/characters/jones.png"
+            src={assetPath("assets/characters/jones.png")}
             alt="Jones"
-            className="w-14 h-24 object-contain drop-shadow-[0_0_6px_rgba(255,0,0,0.5)]"
+            className="h-16 w-10 object-contain drop-shadow-[0_0_6px_rgba(255,0,0,0.5)] sm:h-24 sm:w-14"
             style={{ imageRendering: "pixelated" }}
           />
           <span className="pixel-text text-[7px] text-red-400 mt-1">JONES</span>
@@ -429,7 +430,7 @@ const CenterStats = memo(function CenterStats({ player }: { player: GameState["p
       </div>
 
       {/* Key vitals - compact */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-mono w-full">
+      <div className="grid w-full grid-cols-2 gap-x-2 gap-y-1 text-[8px] font-mono sm:gap-x-4 sm:text-[10px]">
         <span className={player.energy <= 20 ? "text-red-400 animate-pulse" : "text-green-300"}>⚡ {player.energy}</span>
         <span className="text-amber-300 text-right">💰 ${player.money}</span>
         <span className={player.food <= 25 ? "text-red-400 animate-pulse" : "text-green-300"}>🍔 {player.food}</span>
@@ -476,7 +477,7 @@ const Tile = memo(function Tile({ loc, popoverSide, popoverDirection, playerPosi
       title={`${loc.name} — ${isHere ? "You are here" : `Move cost: ${cost}h`}`}
     >
       <span className="location-icon-frame"><LocationIcon locationId={loc.id} size={64} /></span>
-      <span className="max-w-[132px] whitespace-nowrap text-[7px] leading-tight text-center font-bold mt-1 pixel-text text-[#fff3c4] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+      <span className="mt-1 max-w-[72px] whitespace-normal text-center text-[7px] font-bold leading-tight pixel-text text-[#fff3c4] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] sm:max-w-[132px] sm:whitespace-nowrap">
         {loc.name}
       </span>
       {!isHere && <span className={`text-[11px] font-bold font-mono mt-0.5 ${costColor}`}>{cost}h</span>}
@@ -489,8 +490,8 @@ const Tile = memo(function Tile({ loc, popoverSide, popoverDirection, playerPosi
       {/* Player/Jones character markers */}
       {(isHere || isJones) && (
         <div className="absolute -top-3 -right-3 flex gap-0.5">
-          {isHere && <img src="/assets/characters/player.png" alt="Player" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(0,255,255,0.7)]" style={{ imageRendering: "pixelated" }} />}
-          {isJones && <img src="/assets/characters/jones.png" alt="Jones" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(255,0,0,0.7)]" style={{ imageRendering: "pixelated" }} />}
+          {isHere && <img src={assetPath("assets/characters/player.png")} alt="Player" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(0,255,255,0.7)]" style={{ imageRendering: "pixelated" }} />}
+          {isJones && <img src={assetPath("assets/characters/jones.png")} alt="Jones" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(255,0,0,0.7)]" style={{ imageRendering: "pixelated" }} />}
         </div>
       )}
     </button>

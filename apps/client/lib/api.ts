@@ -14,7 +14,10 @@ export async function createGame(req: CreateGameRequest): Promise<GameState> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.game) {
+    throw new Error(data.error || `Could not start the game (HTTP ${res.status}).`);
+  }
   return data.game;
 }
 
