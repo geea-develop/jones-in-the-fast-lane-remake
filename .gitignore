@@ -5,3 +5,11 @@ out/
 .env
 *.tsbuildinfo
 .DS_Store
+
+# Asset generation (RunPod/ComfyUI) - not for public repo
+scripts/generate-assets.py
+generated-assets/
+
+# Playwright output
+playwright-report/
+test-results/

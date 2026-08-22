@@ -18,6 +18,11 @@ import { runJonesTurn } from "../ai-jones.js";
 
 export const gameRouter = Router();
 
+function isValidGoalSelection(selection: GoalSelection): boolean {
+  const hasGoal = selection.money || selection.education || selection.career || selection.happiness;
+  return hasGoal && ["easy", "medium", "hard"].includes(selection.difficulty);
+}
+
 function createPlayer(id: string, name: string): Player {
   return {
     id,
@@ -40,6 +45,10 @@ gameRouter.post("/", async (req: Request, res: Response) => {
   const { playerName, goalSelection } = req.body as CreateGameRequest;
 
   const sel: GoalSelection = goalSelection || DEFAULT_GOAL_SELECTION;
+  if (!isValidGoalSelection(sel)) {
+    res.status(400).json({ error: "Choose at least one goal and a valid difficulty" });
+    return;
+  }
   const goals = DIFFICULTY_GOALS[sel.difficulty] || DEFAULT_GOALS;
 
   const gameId = uuid();
@@ -79,6 +88,10 @@ gameRouter.post("/:id/move", async (req: Request, res: Response) => {
   }
 
   const { location } = req.body as MoveRequest;
+  if (game.status !== "in_progress") {
+    res.status(409).json({ error: "This game has already finished", game });
+    return;
+  }
   const result = movePlayer(game, location);
 
   if (result.error) {
@@ -99,6 +112,10 @@ gameRouter.post("/:id/action", async (req: Request, res: Response) => {
   }
 
   const { action } = req.body as ActionRequest;
+  if (game.status !== "in_progress") {
+    res.status(409).json({ error: "This game has already finished", game });
+    return;
+  }
   const result = performAction(game, action);
 
   if (result.error) {
@@ -115,6 +132,11 @@ gameRouter.post("/:id/end-week", async (req: Request, res: Response) => {
   const game = await loadGame(req.params.id);
   if (!game) {
     res.status(404).json({ error: "Game not found" });
+    return;
+  }
+
+  if (game.status !== "in_progress") {
+    res.status(409).json({ error: "This game has already finished", game, events: [] });
     return;
   }
 

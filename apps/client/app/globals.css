@@ -1,3 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --retro-blue: #305fa8;
+    --retro-gold: #f6bd45;
+    --retro-green: #43b978;
+    --retro-red: #d9685c;
+    --retro-cyan: #56c6d8;
+    --retro-panel: #202b47;
+    --retro-border: #566891;
+    --retro-paper: #e9d59b;
+  }
+}
+
+@layer components {
+  /* Retro panel style — like a DOS window */
+  .retro-panel {
+    @apply rounded-lg border-2;
+    background: var(--retro-panel);
+    border-color: var(--retro-border);
+    box-shadow:
+      inset 1px 1px 0 rgba(255,255,255,0.08),
+      3px 3px 0 rgba(0,0,0,0.4);
+  }
+
+  /* Retro button — chunky 3D look */
+  .retro-btn {
+    @apply font-bold text-xs px-3 py-2 rounded transition-all;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  }
+  .retro-btn:active {
+    box-shadow: 0px 0px 0 rgba(0,0,0,0.5);
+    transform: translate(2px, 2px);
+  }
+
+  /* Pixel text for headers */
+  .pixel-text {
+    font-family: 'Press Start 2P', monospace;
+    letter-spacing: .04em;
+  }
+
+  html { background: #101a2c; }
+  body { background: radial-gradient(circle at 50% -10%, #263b5d 0, #101a2c 58%); color: #f7f0d3; font-family: "Courier New", ui-monospace, monospace; }
+  .game-shell { width: min(1480px, calc(100vw - 40px)); margin: 0 auto; padding: 18px 0 30px; }
+  .board-window { aspect-ratio: 4 / 3; min-height: 420px; border: 3px solid #7184ac; border-radius: 7px; overflow: hidden; background: #356849; box-shadow: inset 0 0 0 2px #17253d, 5px 5px 0 rgba(0,0,0,.38); }
+  .board-window > div { min-height: 100%; }
+  .hud-panel { background: linear-gradient(145deg, rgba(36,49,81,.98), rgba(25,34,58,.98)); }
+  .action-panel { background: linear-gradient(145deg, rgba(32,44,73,.98), rgba(24,32,54,.98)); }
+  .location-icon-frame { display: grid; place-items: center; width: 68px; height: 60px; }
+  .location-icon-frame img { width: 64px; height: 64px; }
+  .metric-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; border: 1px solid currentColor; border-radius: 3px; font: 700 9px/1 "Courier New", monospace; }
+  .game-dialog { animation: dialog-in .14s ease-out both; }
+  @keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .location-popover { opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; }
+  .retro-tile:hover .location-popover, .retro-tile:focus-visible .location-popover { opacity: 1; transform: translateY(0); }
+  @media (max-width: 1279px) { .game-shell { width: min(100% - 24px, 1080px); padding-top: 12px; } }
+  @media (max-width: 900px) { .game-shell { width: min(100% - 20px, 680px); padding-top: 10px; } }
+
+  /* Retro tile hover glow */
+  .retro-tile {
+    transition: all 0.15s ease;
+  }
+  .retro-tile:not(:disabled):hover {
+    box-shadow: 0 0 12px rgba(0, 255, 100, 0.4), inset 0 0 6px rgba(0, 255, 100, 0.1);
+  }
+  .retro-tile:not(:disabled):active {
+    box-shadow: 0 0 4px rgba(0, 255, 100, 0.3);
+  }
+
+  /* Current location pulse */
+  @keyframes location-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(86, 198, 216, 0.4), inset 0 0 4px rgba(86, 198, 216, 0.1); }
+    50% { box-shadow: 0 0 16px rgba(86, 198, 216, 0.6), inset 0 0 8px rgba(86, 198, 216, 0.15); }
+  }
+  .retro-tile.scale-\[1\.03\] {
+    animation: location-pulse 2s ease-in-out infinite;
+  }
+
+  /* Stat bar smooth transitions */
+  .stat-change-flash {
+    animation: stat-flash 0.4s ease-out;
+  }
+  @keyframes stat-flash {
+    0% { background-color: rgba(255, 255, 255, 0.3); }
+    100% { background-color: transparent; }
+  }
+
+  /* Scanline overlay for retro feel (subtle) */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    border-radius: inherit;
+  }
+
+  /* Retro progress bar */
+  .retro-bar {
+    image-rendering: pixelated;
+    background: repeating-linear-gradient(
+      90deg,
+      currentColor 0px,
+      currentColor 3px,
+      transparent 3px,
+      transparent 4px
+    );
+  }
+}

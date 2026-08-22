@@ -16,6 +16,10 @@ import {
 import { GameEvent } from "@jones/shared";
 
 export function movePlayer(game: GameState, location: LocationId): { game: GameState; error?: string } {
+  if (game.status !== "in_progress") {
+    return { game, error: "This game has already finished" };
+  }
+
   const player = game.player;
 
   if (player.position === location) {
@@ -35,6 +39,10 @@ export function movePlayer(game: GameState, location: LocationId): { game: GameS
 }
 
 export function performAction(game: GameState, actionId: ActionId): { game: GameState; error?: string; message?: string } {
+  if (game.status !== "in_progress") {
+    return { game, error: "This game has already finished" };
+  }
+
   const player = game.player;
   const location = LOCATIONS.find((l) => l.id === player.position);
 
@@ -49,6 +57,15 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
   const action = ACTIONS.find((a) => a.id === actionId);
   if (!action) {
     return { game, error: "Unknown action" };
+  }
+
+  // Validate action-specific requirements before making any state changes.
+  if (actionId === "work" && !player.job) {
+    return { game, error: "You need a job first! Visit the Employment Office." };
+  }
+
+  if (actionId === "work" && player.energy < 15) {
+    return { game, error: "Too tired to work effectively. Rest first!" };
   }
 
   if (player.timeUnits < action.timeCost) {
@@ -104,17 +121,13 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
     }
 
     case "work": {
-      if (!player.job) {
-        return { game, error: "You need a job first! Visit the Employment Office." };
-      }
-      if (player.energy < 15) {
-        return { game, error: "Too tired to work effectively. Rest first!" };
-      }
-      player.money += player.job.salary;
-      player.career = Math.min(100, player.career + player.job.careerGain);
+      // Preconditions were checked before costs were deducted.
+      const job = player.job!;
+      player.money += job.salary;
+      player.career = Math.min(100, player.career + job.careerGain);
       player.energy = Math.max(0, player.energy - 20);
       player.turnsEmployed += 1;
-      message = `Worked as ${player.job.title}. Earned $${player.job.salary}. Career +${player.job.careerGain}`;
+      message = `Worked as ${job.title}. Earned $${job.salary}. Career +${job.careerGain}`;
       break;
     }
 
@@ -282,6 +295,10 @@ function rollRandomEvent(player: Player): GameEvent | null {
 export function endWeek(game: GameState): { game: GameState; events: GameEvent[] } {
   const events: GameEvent[] = [];
 
+  if (game.status !== "in_progress") {
+    return { game, events };
+  }
+
   // Food decay (hunger system)
   game.player.food = Math.max(0, game.player.food - FOOD_DECAY_PER_WEEK);
 
@@ -343,6 +360,8 @@ export function endWeek(game: GameState): { game: GameState; events: GameEvent[]
 export function checkWin(game: GameState, player: Player): boolean {
   const sel = game.goalSelection;
   const goals = game.goals;
+
+  if (!sel.money && !sel.education && !sel.career && !sel.happiness) return false;
 
   if (sel.money && player.money < goals.money) return false;
   if (sel.education && player.education < goals.education) return false;

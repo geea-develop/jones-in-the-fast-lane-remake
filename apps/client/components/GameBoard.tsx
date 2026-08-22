@@ -1,8 +1,11 @@
 "use client";
 
-import { memo, useCallback, useMemo } from "react";
-import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost } from "@jones/shared";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost, GameEvent } from "@jones/shared";
 import { moveToLocation, performAction, endWeek } from "@/lib/api";
+import { LocationIcon } from "./LocationIcons";
+import { GameDialog } from "./GameDialog";
+import { playSound } from "@/lib/sounds";
 
 interface GameBoardProps {
   game: GameState;
@@ -12,6 +15,21 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ game, onUpdate, onMessage, onRestart }: GameBoardProps) {
+  const [confirmEndWeek, setConfirmEndWeek] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingAction, setPendingAction] = useState<ActionId | null>(null);
+  const [weekEvents, setWeekEvents] = useState<GameEvent[]>([]);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    };
+  }, []);
+
   const currentLocation = useMemo(
     () => LOCATIONS.find((l) => l.id === game.player.position),
     [game.player.position]
@@ -23,49 +41,90 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
   );
 
   const handleMove = useCallback(async (locationId: LocationId) => {
-    const result = await moveToLocation(game.id, locationId);
-    if (result.error) {
-      onMessage(`❌ ${result.error}`);
-    } else {
-      onUpdate(result.game);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const result = await moveToLocation(game.id, locationId);
+      if (result.error) { playSound("error"); onMessage(`❌ ${result.error}`); }
+      else { playSound("move"); onUpdate(result.game); }
+    } catch {
+      playSound("error"); onMessage("❌ Could not reach the game server. Please try again.");
+    } finally {
+      if (mounted.current) setIsSubmitting(false);
     }
-  }, [game.id, onMessage, onUpdate]);
+  }, [game.id, isSubmitting, onMessage, onUpdate]);
 
   const handleAction = useCallback(async (actionId: ActionId) => {
-    const result = await performAction(game.id, actionId);
-    if (result.error) {
-      onMessage(`❌ ${result.error}`);
-    } else {
-      onUpdate(result.game);
-      if (result.message) onMessage(`✅ ${result.message}`);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const result = await performAction(game.id, actionId);
+      if (result.error) {
+        playSound("error"); onMessage(`❌ ${result.error}`);
+      } else {
+        playSound("action");
+        onUpdate(result.game);
+        if (result.message) onMessage(`✅ ${result.message}`);
+      }
+    } catch {
+      playSound("error"); onMessage("❌ Could not reach the game server. Please try again.");
+    } finally {
+      if (mounted.current) setIsSubmitting(false);
     }
-  }, [game.id, onMessage, onUpdate]);
+  }, [game.id, isSubmitting, onMessage, onUpdate]);
 
   const handleEndWeek = useCallback(async () => {
-    const result = await endWeek(game.id);
-    onUpdate(result.game);
-    result.events.forEach((e) => onMessage(`📢 ${e.message}`));
-  }, [game.id, onMessage, onUpdate]);
+    if (isSubmitting) return;
+    if (!confirmEndWeek) {
+      setConfirmEndWeek(true);
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+      confirmTimer.current = setTimeout(() => {
+        if (mounted.current) setConfirmEndWeek(false);
+        confirmTimer.current = null;
+      }, 3000);
+      return;
+    }
+    setConfirmEndWeek(false);
+    setIsSubmitting(true);
+    try {
+      const result = await endWeek(game.id);
+      playSound("week");
+      onUpdate(result.game);
+      setWeekEvents(result.events);
+    } catch {
+      playSound("error"); onMessage("❌ Could not reach the game server. Please try again.");
+    } finally {
+      if (mounted.current) setIsSubmitting(false);
+    }
+  }, [game.id, isSubmitting, onMessage, onUpdate, confirmEndWeek]);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 grid grid-cols-[1fr_320px] gap-4 h-[calc(100vh-60px)]">
+    <div className="game-shell grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 xl:items-start">
       {/* LEFT — Board + Actions */}
-      <div className="flex flex-col gap-4 min-h-0">
-        {/* Week bar */}
-        <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
-          <span className="font-bold text-sm">📅 Week {game.week}</span>
-          <span className="text-sm">⏱️ <strong>{game.player.timeUnits}</strong> hours left</span>
-          <span className="text-sm">💼 {game.player.job?.title || "Unemployed"}{game.player.job ? ` ($${game.player.job.salary}/shift)` : ""}</span>
+      <div className="flex flex-col gap-3 min-h-0">
+        {/* Week bar — retro header */}
+        <div className="retro-panel flex items-center justify-between px-4 py-2.5">
+          <span className="pixel-text text-[9px] text-amber-400">WK {game.week}</span>
+          <span className="text-sm font-mono"><span className="metric-icon text-cyan-300">TIME</span> <strong className="text-cyan-300">{game.player.timeUnits}</strong>h</span>
+          <span className="text-xs truncate max-w-[180px] text-gray-300">
+            <span className="metric-icon text-amber-300">JOB</span> {game.player.job?.title || "Unemployed"}{game.player.job ? ` ($${game.player.job.salary})` : ""}
+          </span>
           <div className="flex gap-2">
             <button
               onClick={handleEndWeek}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 rounded font-semibold text-xs"
+              disabled={isSubmitting}
+              className={`retro-btn ${
+                confirmEndWeek
+                  ? "bg-red-700 hover:bg-red-800 animate-pulse"
+                  : "bg-amber-700 hover:bg-amber-800"
+              }`}
             >
-              End Week →
+              {confirmEndWeek ? "CONFIRM?" : "END WEEK →"}
             </button>
             <button
               onClick={onRestart}
-              className="px-3 py-1.5 bg-gray-700 hover:bg-red-700 rounded font-semibold text-xs"
+              disabled={isSubmitting}
+              className="retro-btn bg-gray-700 hover:bg-red-800"
               title="Quit and start a new game"
             >
               ✕
@@ -74,19 +133,21 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
         </div>
 
         {/* Board — ring of locations */}
-        <div className="flex-1 relative min-h-0">
+        <div className="relative scanlines board-window">
           <BoardRing
             playerPosition={game.player.position}
             jonesPosition={game.aiJones.position}
             onMove={handleMove}
             timeUnits={game.player.timeUnits}
+            player={game.player}
+            goals={game.goals}
           />
         </div>
 
         {/* Actions at current location */}
-        <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-          <h3 className="text-xs uppercase text-gray-400 font-semibold mb-2">
-            📍 {currentLocation?.icon} {currentLocation?.name} — Available Actions
+        <div className="retro-panel action-panel p-3">
+          <h3 className="pixel-text text-[8px] text-gray-400 mb-2">
+            📍 {currentLocation?.name?.toUpperCase()}
           </h3>
           <div className="flex flex-wrap gap-2">
             {availableActions.map((action) => (
@@ -95,7 +156,8 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
                 action={action}
                 timeUnits={game.player.timeUnits}
                 money={game.player.money}
-                onAction={handleAction}
+                onAction={(id) => setPendingAction(id)}
+                disabled={isSubmitting}
               />
             ))}
             {availableActions.length === 0 && (
@@ -108,47 +170,75 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
       {/* RIGHT — Stats Panel */}
       <div className="flex flex-col gap-3 overflow-y-auto">
         {/* Player goals */}
-        <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-          <h3 className="text-xs uppercase text-gray-400 font-semibold mb-2">👤 {game.player.name} — Goals</h3>
-          <div className="space-y-1.5">
-            <GoalBar icon="💰" label="Money" value={game.player.money} goal={game.goals.money} enabled={game.goalSelection?.money ?? true} />
-            <GoalBar icon="🎓" label="Education" value={game.player.education} goal={game.goals.education} enabled={game.goalSelection?.education ?? true} />
-            <GoalBar icon="💼" label="Career" value={game.player.career} goal={game.goals.career} enabled={game.goalSelection?.career ?? true} />
-            <GoalBar icon="😊" label="Happiness" value={game.player.happiness} goal={game.goals.happiness} enabled={game.goalSelection?.happiness ?? true} />
+        <div className="retro-panel hud-panel p-3">
+          <h3 className="pixel-text text-[8px] text-cyan-400 mb-2">GOALS</h3>
+          <div className="space-y-2">
+            <GoalBar icon="$" label="Money" value={game.player.money} goal={game.goals.money} enabled={game.goalSelection?.money ?? true} />
+            <GoalBar icon="EDU" label="Edu" value={game.player.education} goal={game.goals.education} enabled={game.goalSelection?.education ?? true} />
+            <GoalBar icon="JOB" label="Career" value={game.player.career} goal={game.goals.career} enabled={game.goalSelection?.career ?? true} />
+            <GoalBar icon="HAP" label="Happy" value={game.player.happiness} goal={game.goals.happiness} enabled={game.goalSelection?.happiness ?? true} />
           </div>
         </div>
 
         {/* Player vitals */}
-        <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-          <h3 className="text-xs uppercase text-gray-400 font-semibold mb-2">Vitals</h3>
-          <div className="space-y-1.5">
+        <div className="retro-panel hud-panel p-3">
+          <h3 className="pixel-text text-[8px] text-green-400 mb-2">VITALS</h3>
+          <div className="space-y-2">
             <StatBar icon="⚡" label="Energy" value={game.player.energy} warn={20} />
-            <StatBar icon="🍔" label="Food" value={game.player.food} warn={25} />
+            <StatBar icon="FOOD" label="Food" value={game.player.food} warn={25} />
           </div>
         </div>
 
         {/* Jones tracker */}
-        <div className="bg-gray-800 rounded-lg p-3 border border-gray-700 opacity-80">
-          <h3 className="text-xs uppercase text-gray-400 font-semibold mb-2">🤖 Jones</h3>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-            <span>💰 ${game.aiJones.money}</span>
-            <span>🎓 {game.aiJones.education}</span>
-            <span>💼 {game.aiJones.career}</span>
-            <span>😊 {game.aiJones.happiness}</span>
-            <span className="col-span-2 text-gray-400">
-              Job: {game.aiJones.job?.title || "Unemployed"}
+        <div className="retro-panel hud-panel p-3 opacity-90">
+          <h3 className="pixel-text text-[8px] text-red-400 mb-2">JONES</h3>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs font-mono">
+            <span className="text-green-300">$<span className="text-white">{game.aiJones.money}</span></span>
+            <span className="text-blue-300">EDU <span className="text-white">{game.aiJones.education}</span></span>
+            <span className="text-amber-300">JOB <span className="text-white">{game.aiJones.career}</span></span>
+            <span className="text-pink-300">HAP <span className="text-white">{game.aiJones.happiness}</span></span>
+            <span className="col-span-2 text-gray-400 text-[10px]">
+              {game.aiJones.job?.title || "Unemployed"}
             </span>
           </div>
         </div>
 
         {/* Last event */}
         {game.lastEvent && (
-          <div className="bg-gray-800 rounded-lg p-3 border border-yellow-700/50">
-            <h3 className="text-xs uppercase text-yellow-500 font-semibold mb-1">🎲 Last Event</h3>
+          <div className="retro-panel hud-panel p-3 border-yellow-500/70">
+            <h3 className="pixel-text text-[8px] text-yellow-400 mb-1">EVENT</h3>
             <p className="text-xs text-gray-300">{game.lastEvent}</p>
           </div>
         )}
       </div>
+
+      {pendingAction && (() => {
+        const action = ACTIONS.find((candidate) => candidate.id === pendingAction);
+        if (!action) return null;
+        return (
+          <GameDialog
+            eyebrow={currentLocation?.name.toUpperCase()}
+            title={action.name.toUpperCase()}
+            onClose={() => setPendingAction(null)}
+            onConfirm={() => { setPendingAction(null); void handleAction(action.id); }}
+            confirmLabel="DO IT"
+          >
+            <p>{action.description}.</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-mono text-cyan-200">
+              <span className="border border-slate-500/60 p-2">TIME <strong>{action.timeCost}h</strong></span>
+              <span className="border border-slate-500/60 p-2">CASH <strong>{action.moneyCost ? `$${action.moneyCost}` : "FREE"}</strong></span>
+            </div>
+          </GameDialog>
+        );
+      })()}
+
+      {weekEvents.length > 0 && (
+        <GameDialog eyebrow={`WEEK ${game.week}`} title="WEEKLY REPORT" onClose={() => setWeekEvents([])}>
+          <div className="space-y-2">
+            {weekEvents.map((event, index) => <p key={`${event.type}-${index}`} className="border-b border-slate-500/40 pb-2 last:border-0">{event.message}</p>)}
+          </div>
+        </GameDialog>
+      )}
     </div>
   );
 }
@@ -163,15 +253,15 @@ const GoalBar = memo(function GoalBar({ label, value, goal, icon, enabled }: { l
   const met = value >= goal;
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-4">{icon}</span>
-      <span className="w-16 truncate">{label}</span>
-      <div className="flex-1 h-3 bg-gray-700 rounded-full overflow-hidden">
+      <span className="metric-icon text-amber-300">{icon}</span>
+      <span className="w-12 truncate font-mono text-[10px] text-gray-400">{label}</span>
+      <div className="flex-1 h-3 bg-gray-900 rounded border border-gray-700 overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${met ? "bg-green-500" : "bg-blue-500"}`}
+          className={`h-full transition-all duration-500 ${met ? "bg-green-500" : "bg-cyan-600"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className={`w-16 text-right font-mono ${met ? "text-green-400" : ""}`}>
+      <span className={`w-16 text-right font-mono text-[10px] ${met ? "text-green-400" : "text-gray-300"}`}>
         {label === "Money" ? `$${value}` : value}/{label === "Money" ? `$${goal}` : goal}
       </span>
     </div>
@@ -183,97 +273,120 @@ const StatBar = memo(function StatBar({ label, value, icon, warn }: { label: str
   const isLow = value <= warn;
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-4">{icon}</span>
-      <span className="w-12 truncate">{label}</span>
-      <div className="flex-1 h-2.5 bg-gray-700 rounded-full overflow-hidden">
+      <span className="metric-icon text-green-300">{icon}</span>
+      <span className="w-12 truncate font-mono text-[10px] text-gray-400">{label}</span>
+      <div className="flex-1 h-2.5 bg-gray-900 rounded border border-gray-700 overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-300 ${isLow ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`}
+          className={`h-full transition-all duration-300 ${isLow ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className={`w-8 text-right font-mono ${isLow ? "text-red-400" : ""}`}>{value}</span>
+      <span className={`w-8 text-right font-mono text-[10px] ${isLow ? "text-red-400" : "text-gray-300"}`}>{value}</span>
     </div>
   );
 });
 
-const ActionButton = memo(function ActionButton({ action, timeUnits, money, onAction }: {
+const ACTION_CATEGORIES: Record<string, { emoji: string; color: string }> = {
+  study: { emoji: "📖", color: "border-blue-500/60 hover:border-blue-400" },
+  browse_jobs: { emoji: "📋", color: "border-amber-500/60 hover:border-amber-400" },
+  work: { emoji: "⛏️", color: "border-amber-500/60 hover:border-amber-400" },
+  buy_food: { emoji: "🍔", color: "border-green-500/60 hover:border-green-400" },
+  buy_item: { emoji: "🛒", color: "border-green-500/60 hover:border-green-400" },
+  buy_clothes: { emoji: "👔", color: "border-pink-500/60 hover:border-pink-400" },
+  buy_electronics: { emoji: "📺", color: "border-pink-500/60 hover:border-pink-400" },
+  pay_rent: { emoji: "🏠", color: "border-gray-500/60 hover:border-gray-400" },
+  have_fun: { emoji: "🎉", color: "border-purple-500/60 hover:border-purple-400" },
+  rest: { emoji: "💤", color: "border-cyan-500/60 hover:border-cyan-400" },
+  pawn_item: { emoji: "💎", color: "border-yellow-500/60 hover:border-yellow-400" },
+  deposit: { emoji: "🏦", color: "border-green-500/60 hover:border-green-400" },
+  withdraw: { emoji: "🏦", color: "border-red-500/60 hover:border-red-400" },
+};
+
+const ActionButton = memo(function ActionButton({ action, timeUnits, money, onAction, disabled: isSubmitting }: {
   action: typeof ACTIONS[0];
   timeUnits: number;
   money: number;
   onAction: (id: ActionId) => void;
+  disabled: boolean;
 }) {
   const canAffordTime = timeUnits >= action.timeCost;
   const canAffordMoney = !action.moneyCost || money >= action.moneyCost;
-  const disabled = !canAffordTime || !canAffordMoney;
+  const disabled = isSubmitting || !canAffordTime || !canAffordMoney;
+  const cat = ACTION_CATEGORIES[action.id] || { emoji: "▶", color: "border-gray-500/60 hover:border-gray-400" };
+
   return (
     <button
       onClick={() => onAction(action.id)}
       disabled={disabled}
-      className="flex-1 min-w-[140px] p-2.5 rounded border border-gray-600 bg-gray-750 hover:border-green-500 hover:bg-gray-700 text-left disabled:opacity-40 disabled:cursor-not-allowed transition"
+      aria-label={`${action.name} action`}
+      className={`flex-1 min-w-[160px] p-3 rounded-lg retro-panel border-2 text-left transition-all
+        disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-100
+        hover:scale-[1.02] active:scale-[0.98] ${cat.color}`}
     >
-      <span className="font-semibold text-sm block">{action.name}</span>
-      <span className="text-[10px] text-gray-400 block">
-        ⏱️{action.timeCost}h{action.moneyCost ? ` · 💰$${action.moneyCost}` : ""} — {action.description}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{cat.emoji}</span>
+        <span className="font-bold text-sm text-gray-100">{action.name}</span>
+      </div>
+      <div className="flex items-center gap-3 mt-1.5">
+        <span className="text-[10px] text-cyan-300 font-mono font-bold">⏱ {action.timeCost}h</span>
+        {action.moneyCost ? <span className="text-[10px] text-amber-300 font-mono font-bold">💰 ${action.moneyCost}</span> : null}
+      </div>
+      <span className="text-[10px] text-gray-500 block mt-1">{action.description}</span>
     </button>
   );
 });
 
 // ──────────────────────────────────────────────────
-// Board Ring Component — memoized with stable tiles
+// Board Ring Component — with center stats
 // ──────────────────────────────────────────────────
 
-const BoardRing = memo(function BoardRing({
-  playerPosition,
-  jonesPosition,
-  onMove,
-  timeUnits,
-}: {
+interface BoardRingProps {
   playerPosition: LocationId;
   jonesPosition: LocationId;
   onMove: (id: LocationId) => void;
   timeUnits: number;
-}) {
+  player: GameState["player"];
+  goals: GameState["goals"];
+}
+
+const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMove, timeUnits, player, goals }: BoardRingProps) {
   const top = LOCATIONS.slice(0, 4);
   const right = LOCATIONS.slice(4, 6);
   const bottom = LOCATIONS.slice(6, 10).reverse();
   const left = LOCATIONS.slice(10, 13).reverse();
 
   return (
-    <div className="w-full h-full grid grid-rows-[auto_1fr_auto] grid-cols-[auto_1fr_auto] gap-1">
+    <div className="w-full h-full grid grid-rows-[auto_1fr_auto] grid-cols-[auto_1fr_auto] gap-2 p-2"
+      style={{ backgroundImage: "url(/assets/board-bg.png)", backgroundSize: "cover", backgroundPosition: "center", borderRadius: "8px" }}
+    >
       {/* Top row */}
-      <div className="col-span-3 grid grid-cols-4 gap-1">
+      <div className="col-span-3 grid grid-cols-4 gap-2">
         {top.map((loc) => (
           <Tile key={loc.id} loc={loc} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
         ))}
       </div>
 
       {/* Left column */}
-      <div className="row-span-1 flex flex-col gap-1 justify-center">
+      <div className="row-span-1 flex flex-col gap-2 justify-around">
         {left.map((loc) => (
           <Tile key={loc.id} loc={loc} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
         ))}
       </div>
 
-      {/* Center */}
+      {/* Center — player vs jones portraits */}
       <div className="row-span-1 flex items-center justify-center">
-        <div className="text-center text-gray-600">
-          <p className="text-3xl mb-1">🏙️</p>
-          <p className="text-xs font-semibold">TOWN</p>
-          <p className="text-[10px] text-gray-500">Move around the ring</p>
-          <p className="text-[10px] text-gray-500">to visit locations</p>
-        </div>
+        <CenterStats player={player} goals={goals} />
       </div>
 
       {/* Right column */}
-      <div className="row-span-1 flex flex-col gap-1 justify-center">
+      <div className="row-span-1 flex flex-col gap-2 justify-around">
         {right.map((loc) => (
           <Tile key={loc.id} loc={loc} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
         ))}
       </div>
 
       {/* Bottom row */}
-      <div className="col-span-3 grid grid-cols-4 gap-1">
+      <div className="col-span-3 grid grid-cols-4 gap-2">
         {bottom.map((loc) => (
           <Tile key={loc.id} loc={loc} playerPosition={playerPosition} jonesPosition={jonesPosition} onMove={onMove} timeUnits={timeUnits} />
         ))}
@@ -281,6 +394,51 @@ const BoardRing = memo(function BoardRing({
     </div>
   );
 });
+
+// ──────────────────────────────────────────────────
+// Center Stats
+// ──────────────────────────────────────────────────
+
+const CenterStats = memo(function CenterStats({ player }: { player: GameState["player"]; goals: GameState["goals"] }) {
+  return (
+    <div className="retro-panel p-4 flex flex-col items-center gap-3 min-w-[200px]">
+      {/* Character portrait */}
+      <div className="flex items-end gap-4">
+        <div className="flex flex-col items-center">
+          <img
+            src="/assets/characters/player.png"
+            alt="Player"
+            className="w-14 h-24 object-contain drop-shadow-[0_0_6px_rgba(0,255,255,0.5)]"
+            style={{ imageRendering: "pixelated" }}
+          />
+          <span className="pixel-text text-[7px] text-cyan-400 mt-1">YOU</span>
+        </div>
+        <span className="pixel-text text-[8px] text-gray-500 pb-6">VS</span>
+        <div className="flex flex-col items-center">
+          <img
+            src="/assets/characters/jones.png"
+            alt="Jones"
+            className="w-14 h-24 object-contain drop-shadow-[0_0_6px_rgba(255,0,0,0.5)]"
+            style={{ imageRendering: "pixelated" }}
+          />
+          <span className="pixel-text text-[7px] text-red-400 mt-1">JONES</span>
+        </div>
+      </div>
+
+      {/* Key vitals - compact */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-mono w-full">
+        <span className={player.energy <= 20 ? "text-red-400 animate-pulse" : "text-green-300"}>⚡ {player.energy}</span>
+        <span className="text-amber-300 text-right">💰 ${player.money}</span>
+        <span className={player.food <= 25 ? "text-red-400 animate-pulse" : "text-green-300"}>🍔 {player.food}</span>
+        <span className="text-cyan-300 text-right">⏱ {player.timeUnits}h</span>
+      </div>
+    </div>
+  );
+});
+
+// ──────────────────────────────────────────────────
+// Tile — with pixel icon and color-coded cost
+// ──────────────────────────────────────────────────
 
 const Tile = memo(function Tile({ loc, playerPosition, jonesPosition, onMove, timeUnits }: {
   loc: typeof LOCATIONS[0];
@@ -296,27 +454,40 @@ const Tile = memo(function Tile({ loc, playerPosition, jonesPosition, onMove, ti
 
   const handleClick = useCallback(() => onMove(loc.id), [onMove, loc.id]);
 
+  // Color-code the cost
+  const costColor = isHere ? "" : cost <= 1 ? "text-green-400" : cost <= 2 ? "text-yellow-400" : "text-orange-400";
+
   return (
     <button
       onClick={handleClick}
-      disabled={isHere}
-      className={`relative flex flex-col items-center justify-center p-1.5 rounded-lg border-2 transition-all min-h-[70px] ${
+      disabled={!canMove}
+      className={`retro-tile relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all duration-150 ${
         isHere
-          ? "border-blue-400 bg-blue-900/50 ring-2 ring-blue-400/50"
+          ? "border-cyan-400 bg-cyan-900/50 ring-2 ring-cyan-400/30 scale-[1.03]"
           : canMove
-          ? "border-gray-600 bg-gray-800 hover:border-green-500 hover:bg-gray-750 cursor-pointer"
-          : "border-gray-700 bg-gray-800/50 opacity-60"
+          ? "border-gray-600 bg-[#1a1a2e]/90 hover:border-green-400 hover:bg-[#1a2a3e] cursor-pointer hover:scale-[1.04] active:scale-[0.97]"
+          : "border-gray-700/50 bg-gray-900/40 opacity-40 cursor-default"
       }`}
       title={`${loc.name} — ${isHere ? "You are here" : `Move cost: ${cost}h`}`}
     >
-      <span className="text-xl">{loc.icon}</span>
-      <span className="text-[9px] leading-tight text-center font-medium mt-0.5">{loc.name}</span>
-      {!isHere && <span className="text-[8px] text-gray-500">{cost}h</span>}
-      {/* Player/Jones markers */}
-      <div className="absolute -top-1 -right-1 flex gap-0.5">
-        {isHere && <span className="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-300 text-[8px] flex items-center justify-center">P</span>}
-        {isJones && <span className="w-4 h-4 rounded-full bg-red-500 border-2 border-red-300 text-[8px] flex items-center justify-center">J</span>}
-      </div>
+      <span className="location-icon-frame"><LocationIcon locationId={loc.id} size={64} /></span>
+      <span className="max-w-[132px] whitespace-nowrap text-[7px] leading-tight text-center font-bold mt-1 pixel-text text-[#fff3c4] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+        {loc.name}
+      </span>
+      {!isHere && <span className={`text-[11px] font-bold font-mono mt-0.5 ${costColor}`}>{cost}h</span>}
+      {isHere && <span className="text-[8px] font-mono text-cyan-300 mt-0.5">📍 HERE</span>}
+      <span className="location-popover absolute left-1/2 top-full z-30 mt-2 w-44 -translate-x-1/2 rounded border border-[#8a7a4c] bg-[#202b47] p-2.5 text-left text-[10px] leading-tight text-[#f7f0d3] shadow-xl">
+        <strong className="block text-[#ffe39b] text-[11px]">{loc.name}</strong>
+        <span className="mt-1 block text-slate-300">{loc.description}</span>
+        {!isHere && <span className="mt-1.5 block font-mono text-cyan-300 font-bold">MOVE: {cost}h</span>}
+      </span>
+      {/* Player/Jones character markers */}
+      {(isHere || isJones) && (
+        <div className="absolute -top-3 -right-3 flex gap-0.5">
+          {isHere && <img src="/assets/characters/player.png" alt="Player" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(0,255,255,0.7)]" style={{ imageRendering: "pixelated" }} />}
+          {isJones && <img src="/assets/characters/jones.png" alt="Jones" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(255,0,0,0.7)]" style={{ imageRendering: "pixelated" }} />}
+        </div>
+      )}
     </button>
   );
 });

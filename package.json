@@ -8,15 +8,28 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev:server & npm run dev:client",
+    "dev": "node scripts/kill-local-dev.mjs && concurrently --kill-others-on-fail --handle-input --names backend,frontend --prefix name \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "npm run dev --workspace=@jones/server",
     "dev:client": "npm run dev --workspace=@jones/client",
+    "lint": "eslint .",
     "build": "npm run build --workspace=@jones/shared && npm run build --workspace=@jones/server && npm run build --workspace=@jones/client",
     "build:shared": "npm run build --workspace=@jones/shared",
     "build:server": "npm run build --workspace=@jones/server",
-    "build:client": "npm run build --workspace=@jones/client"
+    "build:client": "npm run build --workspace=@jones/client",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install chromium chromium-headless-shell"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
+    "concurrently": "^9.2.4",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.5.0",
+    "typescript-eslint": "^8.67.0"
   }
 }

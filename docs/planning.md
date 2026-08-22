@@ -47,7 +47,7 @@ A modern remake of "Jones in the Fast Lane" (Sierra, 1991). A board-game-style l
 
 ## Scope — v1 POC
 
-**Approach: Simple modernized remake — get the basics working first.**
+**Approach: A focused single-player remake with a retro VGA-inspired interface.**
 
 ## Scope
 
@@ -60,7 +60,7 @@ A modern remake of "Jones in the Fast Lane" (Sierra, 1991). A board-game-style l
 - Win condition: reach target thresholds in all goal categories before Jones does
 - Persistent session — player can close browser and resume later
 - Web-based (browser)
-- Simple modernized UI (not pixel-faithful)
+- Retro VGA-inspired UI with original generated artwork
 
 ### v2 — Local Multiplayer
 - Up to 4 players (hot-seat / local turn-based, like the original)
@@ -69,14 +69,14 @@ A modern remake of "Jones in the Fast Lane" (Sierra, 1991). A board-game-style l
 - Smarter AI Jones opponent
 - Full location set (8 buildings)
 - Inventory / item system
-- Sound effects, animations
+- Expanded sound effects and animations
 - Mobile-friendly UI
 
 ## Tech Stack (simplified from monopoly — no real-time needed)
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Next.js 14, React 18, Tailwind CSS |
+| Frontend | Next.js 16, React 19, Tailwind CSS |
 | Backend | Express, REST API, Node.js 20 |
 | Database | Upstash Redis (session/game state persistence) |
 | Shared | TypeScript — types, game data, constants |
@@ -91,7 +91,7 @@ A modern remake of "Jones in the Fast Lane" (Sierra, 1991). A board-game-style l
 jones-in-the-fast-lane-remake/
 ├── apps/
 │   ├── client/          # Next.js — game UI, board, player HUD
-│   └── server/          # Express + Socket.IO — game state, turns, rules
+│   └── server/          # Express REST API — game state, turns, rules
 ├── packages/
 │   └── shared/          # Types, locations, stats, event contracts
 ├── docs/
@@ -139,17 +139,28 @@ interface Player {
 Reach target threshold in all goal categories (education, career, money, happiness).
 
 ### Session Persistence
-- Player gets a session ID (stored in cookie/localStorage)
+- Player gets a session ID (stored in sessionStorage)
 - Game state saved to Redis on each action
 - On return, load state from Redis and resume where left off
+
+## Current implementation status
+
+The v1 loop is implemented end to end:
+
+- Express REST API with guarded game transitions, AI Jones, weekly events, and bounded in-memory fallback state.
+- Next.js board UI with the full location ring, HUD, actions, dialogs, popovers, sound feedback, and generated pixel-art assets.
+- Cleanup and shutdown handling for timers, async requests, React effects, and local development processes.
+- ESLint with `react-hooks/exhaustive-deps` enabled and CI checks for lint, server tests, builds, and Playwright E2E tests.
+- Playwright coverage for game creation, movement, action confirmation, end-week reports, and invalid goal selection.
 
 ## Next Steps
 
 - [x] Collect reference links and forked repos
-- [x] Review monopoly architecture for reuse
-- [x] Define scope for v1 POC
-- [ ] Scaffold monorepo (copy monopoly structure, strip game-specific logic)
-- [ ] Implement shared types (Player, Location, Game state, events)
-- [ ] Build server — game creation, join, turn loop
-- [ ] Build client — simple board UI, player HUD, actions panel
-- [ ] Playtest basic loop: move → act → end turn → win
+- [x] Define scope and shared game model
+- [x] Implement the single-player server and client loop
+- [x] Add cleanup, linting, CI, local process management, and E2E coverage
+- [ ] Complete visual fidelity pass against the original reference screenshots
+- [ ] Normalize/crop generated sprites and tune responsive wide-screen scaling
+- [ ] Add resume and game-over E2E coverage
+- [ ] Add a local production-build/bundle analysis workflow
+- [ ] Expand gameplay with inventory, richer events, and multiplayer foundations

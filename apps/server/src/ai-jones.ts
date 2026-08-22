@@ -1,5 +1,6 @@
 import {
   GameState,
+  Player,
   LocationId,
   ActionId,
   ACTIONS,
@@ -36,6 +37,9 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
     jones.happiness = Math.max(0, jones.happiness - 10);
   }
 
+  // Track actions for turn summary
+  const actionLog: Record<string, number> = {};
+
   // Execute actions until time runs out
   let actions = 0;
   while (jones.timeUnits > 0 && actions < 20) {
@@ -63,6 +67,7 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
     // Execute
     jones.timeUnits -= actionDef.timeCost;
     if (actionDef.moneyCost) jones.money -= actionDef.moneyCost;
+    actionLog[action] = (actionLog[action] || 0) + 1;
 
     switch (action) {
       case "study":
@@ -76,6 +81,7 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
           jones.job = best;
           jones.career = Math.min(100, jones.career + best.careerGain);
           jones.turnsEmployed = 0;
+          actionLog["got_new_job"] = 1;
         }
         break;
       }
@@ -105,6 +111,10 @@ export function runJonesTurn(game: GameState): { game: GameState; events: GameEv
         break;
     }
   }
+
+  // Build turn summary
+  const summary = buildJonesSummary(actionLog, jones);
+  events.push({ type: "jones_turn", message: summary });
 
   // Jones pays rent
   jones.money -= WEEKLY_RENT;
@@ -164,7 +174,8 @@ function chooseAction(game: GameState, strategy: JonesStrategy): ActionId | null
   // Need happiness to avoid spiral
   if (jones.happiness < 20) {
     if (jones.money >= 40) return "buy_clothes";
-    return "have_fun";
+    if (jones.money >= 20) return "have_fun";
+    return jones.job ? "work" : "browse_jobs";
   }
 
   // === INCOME — always make sure we have a job ===
@@ -203,7 +214,7 @@ function chooseAction(game: GameState, strategy: JonesStrategy): ActionId | null
         ["career", gaps.career],
         ["happiness", gaps.happiness],
         ["money", gaps.money],
-      ].filter(([_, v]) => (v as number) > 0) as [string, number][];
+      ].filter(([, v]) => (v as number) > 0) as [string, number][];
 
       priorities.sort((a, b) => b[1] - a[1]);
 
@@ -257,4 +268,22 @@ function getLocationForAction(action: ActionId): LocationId {
     case "deposit":
     case "withdraw": return "bank";
   }
+}
+
+function buildJonesSummary(actionLog: Record<string, number>, jones: Player): string {
+  const parts: string[] = [];
+
+  if (actionLog["work"]) parts.push(`worked ${actionLog["work"]}x`);
+  if (actionLog["study"]) parts.push(`studied ${actionLog["study"]}x`);
+  if (actionLog["have_fun"]) parts.push("had fun");
+  if (actionLog["buy_food"]) parts.push("bought food");
+  if (actionLog["buy_clothes"]) parts.push("bought clothes");
+  if (actionLog["buy_electronics"]) parts.push("bought electronics");
+  if (actionLog["rest"]) parts.push("rested");
+  if (actionLog["got_new_job"]) parts.push(`got a job as ${jones.job?.title}`);
+  if (actionLog["browse_jobs"] && !actionLog["got_new_job"]) parts.push("browsed jobs");
+
+  if (parts.length === 0) parts.push("did nothing useful");
+
+  return `🤖 Jones: ${parts.join(", ")}`;
 }

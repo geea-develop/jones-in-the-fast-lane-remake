@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { GameState, GoalSelection, Difficulty, DIFFICULTY_GOALS } from "@jones/shared";
 import { createGame, loadGame } from "@/lib/api";
 import GameBoard from "@/components/GameBoard";
+import { useToasts, ToastContainer } from "@/components/Toast";
 
 export default function Home() {
   const [game, setGame] = useState<GameState | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [gameId, setGameId] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const { toasts, addToast, dismissToast } = useToasts();
   const [goalSelection, setGoalSelection] = useState<GoalSelection>({
     money: true,
     education: true,
@@ -27,7 +28,7 @@ export default function Home() {
         .then((g) => {
           if (!cancelled && g && g.status === "in_progress") {
             setGame(g);
-            setMessages(["Game resumed from last session."]);
+            addToast("Game resumed from last session.", "info");
           }
         })
         .catch((err) => {
@@ -35,17 +36,22 @@ export default function Home() {
         });
     }
     return () => { cancelled = true; };
-  }, []);
+  }, [addToast]);
 
-  const addMessage = useCallback((msg: string) => {
-    setMessages((prev) => [msg, ...prev].slice(0, 20));
-  }, []);
+  const handleMessage = useCallback((msg: string) => {
+    // Determine toast type from message content
+    const type = msg.startsWith("❌") ? "error" as const
+      : msg.startsWith("🤖") ? "jones" as const
+      : msg.startsWith("✅") ? "success" as const
+      : "info" as const;
+    addToast(msg, type);
+  }, [addToast]);
 
   async function handleNewGame() {
     const g = await createGame({ playerName: playerName || "Player", goalSelection });
     setGame(g);
-    setMessages([]);
     sessionStorage.setItem("jones_game_id", g.id);
+    addToast("New game started! Good luck!", "success");
   }
 
   async function handleResume() {
@@ -54,75 +60,87 @@ export default function Home() {
     const g = await loadGame(id);
     if (g) {
       setGame(g);
-      addMessage("Game resumed!");
+      addToast("Game resumed!", "success");
     } else {
-      addMessage("❌ Game not found");
+      addToast("Game not found", "error");
     }
   }
 
   const handleRestart = useCallback(() => {
     setGame(null);
-    setMessages([]);
     sessionStorage.removeItem("jones_game_id");
   }, []);
 
   // Game Over screen
   if (game && game.status !== "in_progress") {
+    const won = game.status === "won";
     return (
       <main className="max-w-4xl mx-auto p-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">
-          {game.status === "won" ? "🎉 You Win!" : "😞 Game Over"}
+        {/* Winner/Loser character display */}
+        <div className="flex items-end justify-center gap-8 mb-6">
+          <div className={`flex flex-col items-center ${won ? "scale-110" : "opacity-60 scale-90"}`}>
+            <img src="/assets/characters/player.png" alt="Player" className="w-20 h-36 object-contain" style={{ imageRendering: "pixelated" }} />
+            <span className="pixel-text text-[8px] text-cyan-400 mt-1">{game.player.name.toUpperCase()}</span>
+          </div>
+          <div className={`flex flex-col items-center ${!won ? "scale-110" : "opacity-60 scale-90"}`}>
+            <img src="/assets/characters/jones.png" alt="Jones" className="w-20 h-36 object-contain" style={{ imageRendering: "pixelated" }} />
+            <span className="pixel-text text-[8px] text-red-400 mt-1">JONES</span>
+          </div>
+        </div>
+
+        <h1 className="pixel-text text-2xl mb-4 leading-relaxed">
+          {won
+            ? <span className="text-green-400">🎉 YOU WIN!</span>
+            : <span className="text-red-400">💀 GAME OVER</span>}
         </h1>
         <p className="text-gray-400 mb-4">
-          {game.status === "won"
+          {won
             ? "You reached all your goals before Jones!"
             : "Jones beat you to the finish line."}
         </p>
-        <p className="text-lg">Final stats — Week {game.week}</p>
+        <p className="pixel-text text-[10px] text-gray-500">WEEK {game.week}</p>
         <div className="grid grid-cols-2 gap-4 mt-4 max-w-md mx-auto text-left">
-          <div className="bg-gray-800 rounded p-3">
-            <p className="font-bold">{game.player.name}</p>
-            <p>💰 ${game.player.money} | 🎓 {game.player.education} | 💼 {game.player.career} | 😊 {game.player.happiness}</p>
+          <div className="retro-panel p-3">
+            <p className="pixel-text text-[8px] text-cyan-400 mb-1">{game.player.name.toUpperCase()}</p>
+            <p className="font-mono text-sm">💰 ${game.player.money} | 🎓 {game.player.education} | 💼 {game.player.career} | 😊 {game.player.happiness}</p>
           </div>
-          <div className="bg-gray-800 rounded p-3">
-            <p className="font-bold">Jones</p>
-            <p>💰 ${game.aiJones.money} | 🎓 {game.aiJones.education} | 💼 {game.aiJones.career} | 😊 {game.aiJones.happiness}</p>
+          <div className="retro-panel p-3">
+            <p className="pixel-text text-[8px] text-red-400 mb-1">JONES</p>
+            <p className="font-mono text-sm">💰 ${game.aiJones.money} | 🎓 {game.aiJones.education} | 💼 {game.aiJones.career} | 😊 {game.aiJones.happiness}</p>
           </div>
         </div>
         <button
           onClick={() => { setGame(null); sessionStorage.removeItem("jones_game_id"); }}
-          className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded font-semibold"
+          className="retro-btn mt-6 px-6 py-3 bg-green-700 hover:bg-green-800 text-lg"
         >
-          Play Again
+          ▶ PLAY AGAIN
         </button>
       </main>
     );
   }
 
-  // Game in progress
+  // Game in progress — no H1, GameBoard takes full viewport
   if (game) {
     return (
-      <main className="max-w-5xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-4">🏃 Jones in the Fast Lane</h1>
-        <GameBoard game={game} onUpdate={setGame} onMessage={addMessage} onRestart={handleRestart} />
-
-        {/* Message Log */}
-        <div className="mt-6 bg-gray-800 rounded-lg p-4 border border-gray-700 max-h-40 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-gray-400 mb-2">📜 Log</h3>
-          {messages.length === 0 && <p className="text-gray-500 text-sm">No events yet. Start playing!</p>}
-          {messages.map((msg, i) => (
-            <p key={i} className="text-sm text-gray-300">{msg}</p>
-          ))}
-        </div>
-      </main>
+      <>
+        <GameBoard game={game} onUpdate={setGame} onMessage={handleMessage} onRestart={handleRestart} />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </>
     );
   }
 
   // Start screen
   return (
-    <main className="max-w-md mx-auto p-8 text-center">
-      <h1 className="text-4xl font-bold mb-2">🏃 Jones in the Fast Lane</h1>
-      <p className="text-gray-400 mb-8">A modern remake — race to your life goals before Jones does!</p>
+    <main className="max-w-lg mx-auto p-8 text-center">
+      {/* Title with character art */}
+      <div className="flex items-end justify-center gap-6 mb-4">
+        <img src="/assets/characters/player.png" alt="Player" className="w-16 h-28 object-contain" style={{ imageRendering: "pixelated" }} />
+        <div>
+          <h1 className="pixel-text text-xl text-amber-400 leading-relaxed">JONES IN THE<br/>FAST LANE</h1>
+          <p className="text-gray-400 text-sm mt-2">Race to your life goals before Jones does!</p>
+        </div>
+        <img src="/assets/characters/jones.png" alt="Jones" className="w-16 h-28 object-contain" style={{ imageRendering: "pixelated" }} />
+      </div>
 
       <div className="space-y-4">
         <input
@@ -130,43 +148,43 @@ export default function Home() {
           placeholder="Your name"
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
-          className="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white"
+          className="w-full p-3 rounded retro-panel text-white font-mono focus:outline-none focus:border-cyan-500"
         />
 
         {/* Difficulty */}
         <div className="text-left">
-          <label className="text-sm text-gray-400 block mb-1">Difficulty</label>
+          <label className="pixel-text text-[8px] text-gray-400 block mb-2">DIFFICULTY</label>
           <div className="grid grid-cols-3 gap-2">
             {(["easy", "medium", "hard"] as Difficulty[]).map((d) => (
               <button
                 key={d}
                 onClick={() => setGoalSelection({ ...goalSelection, difficulty: d })}
-                className={`p-2 rounded border text-sm font-semibold capitalize ${
+                className={`retro-btn uppercase ${
                   goalSelection.difficulty === d
-                    ? "bg-blue-700 border-blue-500"
-                    : "bg-gray-800 border-gray-700 hover:border-gray-500"
+                    ? "bg-cyan-700 border-cyan-500 text-white"
+                    : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
                 }`}
               >
                 {d}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Targets: 💰${DIFFICULTY_GOALS[goalSelection.difficulty].money} | 🎓{DIFFICULTY_GOALS[goalSelection.difficulty].education} | 💼{DIFFICULTY_GOALS[goalSelection.difficulty].career} | 😊{DIFFICULTY_GOALS[goalSelection.difficulty].happiness}
+          <p className="text-xs text-gray-500 mt-2 font-mono">
+            💰${DIFFICULTY_GOALS[goalSelection.difficulty].money} | 🎓{DIFFICULTY_GOALS[goalSelection.difficulty].education} | 💼{DIFFICULTY_GOALS[goalSelection.difficulty].career} | 😊{DIFFICULTY_GOALS[goalSelection.difficulty].happiness}
           </p>
         </div>
 
         {/* Goal categories */}
         <div className="text-left">
-          <label className="text-sm text-gray-400 block mb-1">Goals to pursue</label>
+          <label className="pixel-text text-[8px] text-gray-400 block mb-2">GOALS</label>
           <div className="grid grid-cols-2 gap-2">
             {(["money", "education", "career", "happiness"] as const).map((g) => (
-              <label key={g} className="flex items-center gap-2 p-2 rounded bg-gray-800 border border-gray-700 cursor-pointer">
+              <label key={g} className="flex items-center gap-2 p-2 rounded retro-panel cursor-pointer hover:border-cyan-600 transition">
                 <input
                   type="checkbox"
                   checked={goalSelection[g]}
                   onChange={() => setGoalSelection({ ...goalSelection, [g]: !goalSelection[g] })}
-                  className="accent-blue-500"
+                  className="accent-cyan-500"
                 />
                 <span className="capitalize text-sm">{g}</span>
               </label>
@@ -176,9 +194,10 @@ export default function Home() {
 
         <button
           onClick={handleNewGame}
-          className="w-full p-3 rounded bg-blue-600 hover:bg-blue-700 font-semibold"
+          disabled={!goalSelection.money && !goalSelection.education && !goalSelection.career && !goalSelection.happiness}
+          className="retro-btn w-full p-3 bg-green-700 hover:bg-green-800 text-lg"
         >
-          Start Game
+          ▶ START GAME
         </button>
 
         <div className="border-t border-gray-700 pt-4">
@@ -187,13 +206,13 @@ export default function Home() {
             placeholder="Game ID (or auto-resume)"
             value={gameId}
             onChange={(e) => setGameId(e.target.value)}
-            className="w-full p-3 rounded bg-gray-800 border border-gray-700 text-white mb-2"
+            className="w-full p-3 rounded retro-panel text-white font-mono mb-2 focus:outline-none focus:border-cyan-500"
           />
           <button
             onClick={handleResume}
-            className="w-full p-3 rounded bg-gray-700 hover:bg-gray-600 font-semibold"
+            className="retro-btn w-full p-3 bg-gray-700 hover:bg-gray-600"
           >
-            Resume Game
+            RESUME
           </button>
         </div>
       </div>
