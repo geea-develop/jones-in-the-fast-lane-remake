@@ -1,19 +1,21 @@
 import {
-  GameState,
-  Player,
   LocationId,
   ActionId,
   LOCATIONS,
   ACTIONS,
+  getMovementCost,
+} from "./locations.js";
+import {
+  GameState,
+  Player,
   JOBS,
   TIME_UNITS_PER_WEEK,
   WEEKLY_RENT,
   FOOD_DECAY_PER_WEEK,
   HUNGER_ENERGY_PENALTY,
   LOW_ENERGY_FIRE_THRESHOLD,
-  getMovementCost,
-} from "@jones/shared";
-import { GameEvent } from "@jones/shared";
+} from "./game.js";
+import { GameEvent } from "./api.js";
 
 export function movePlayer(game: GameState, location: LocationId): { game: GameState; error?: string } {
   if (game.status !== "in_progress") {

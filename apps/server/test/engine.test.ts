@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GameState, TIME_UNITS_PER_WEEK } from "@jones/shared";
-import { checkWin, performAction } from "../src/engine.ts";
+import { GameState, TIME_UNITS_PER_WEEK, checkWin, performAction } from "@jones/shared";
 
 function makeGame(): GameState {
   const player = {

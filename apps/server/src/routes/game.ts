@@ -1,69 +1,28 @@
 import { Router, Request, Response } from "express";
-import { v4 as uuid } from "uuid";
 import {
-  GameState,
-  Player,
-  DEFAULT_GOALS,
-  DEFAULT_GOAL_SELECTION,
-  DIFFICULTY_GOALS,
-  TIME_UNITS_PER_WEEK,
   CreateGameRequest,
   MoveRequest,
   ActionRequest,
-  GoalSelection,
+  movePlayer,
+  performAction,
+  endWeek,
+  runJonesTurn,
+  createGame,
 } from "@jones/shared";
 import { saveGame, loadGame } from "../store.js";
-import { movePlayer, performAction, endWeek } from "../engine.js";
-import { runJonesTurn } from "../ai-jones.js";
 
 export const gameRouter = Router();
-
-function isValidGoalSelection(selection: GoalSelection): boolean {
-  const hasGoal = selection.money || selection.education || selection.career || selection.happiness;
-  return hasGoal && ["easy", "medium", "hard"].includes(selection.difficulty);
-}
-
-function createPlayer(id: string, name: string): Player {
-  return {
-    id,
-    name,
-    money: 100,
-    education: 0,
-    career: 0,
-    happiness: 50,
-    energy: 100,
-    food: 80,
-    timeUnits: TIME_UNITS_PER_WEEK,
-    position: "home",
-    job: null,
-    turnsEmployed: 0,
-  };
-}
 
 // POST / — create new game
 gameRouter.post("/", async (req: Request, res: Response) => {
   const { playerName, goalSelection } = req.body as CreateGameRequest;
 
-  const sel: GoalSelection = goalSelection || DEFAULT_GOAL_SELECTION;
-  if (!isValidGoalSelection(sel)) {
-    res.status(400).json({ error: "Choose at least one goal and a valid difficulty" });
+  const result = createGame({ playerName, goalSelection });
+  if (result.error || !result.game) {
+    res.status(400).json({ error: result.error ?? "Invalid game configuration" });
     return;
   }
-  const goals = DIFFICULTY_GOALS[sel.difficulty] || DEFAULT_GOALS;
-
-  const gameId = uuid();
-  const game: GameState = {
-    id: gameId,
-    player: createPlayer(uuid(), playerName || "Player"),
-    aiJones: createPlayer("jones", "Jones"),
-    week: 1,
-    goals,
-    goalSelection: sel,
-    status: "in_progress",
-    lastEvent: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  const game = result.game;
 
   await saveGame(game);
   res.status(201).json({ game });
