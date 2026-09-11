@@ -55,6 +55,8 @@ self.addEventListener("fetch", (event) => {
 
   // Connectivity probe: always go to the network, never serve from cache, so
   // callers can reliably detect offline even when the SW controls the page.
+  // The "__net_probe" flag is the contract owned by lib/connectivity.ts
+  // (NET_PROBE_PARAM) — keep these two in sync.
   if (url.searchParams.has("__net_probe")) {
     event.respondWith(fetch(req));
     return;
