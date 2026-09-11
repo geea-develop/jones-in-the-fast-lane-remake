@@ -1,17 +1,19 @@
 import {
-  GameState,
-  Player,
   LocationId,
   ActionId,
   ACTIONS,
+  getMovementCost,
+} from "./locations.js";
+import {
+  GameState,
+  Player,
   JOBS,
   TIME_UNITS_PER_WEEK,
   WEEKLY_RENT,
   FOOD_DECAY_PER_WEEK,
   HUNGER_ENERGY_PENALTY,
-  getMovementCost,
-} from "@jones/shared";
-import { GameEvent } from "@jones/shared";
+} from "./game.js";
+import { GameEvent } from "./api.js";
 import { checkWin } from "./engine.js";
 
 type JonesStrategy = "balanced" | "career_rush" | "education_first" | "money_grind";

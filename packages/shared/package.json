@@ -9,6 +9,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "typescript": "5.5.4"
+    "typescript": "5.5.4",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "10.0.0"
   }
 }

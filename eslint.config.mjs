@@ -33,4 +33,29 @@ export default tseslint.config(
       globals: globals.node,
     },
   },
+  {
+    // Service worker runs in the ServiceWorkerGlobalScope.
+    files: ["apps/client/public/sw.js"],
+    languageOptions: {
+      globals: {
+        ...globals.serviceworker,
+        importScripts: "readonly",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-empty": "off",
+    },
+  },
+  {
+    // CommonJS build/tooling scripts run in Node.
+    files: ["**/*.cjs"],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: "commonjs",
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 );

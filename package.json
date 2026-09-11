@@ -12,6 +12,7 @@
     "dev:server": "npm run dev --workspace=@jones/server",
     "dev:client": "npm run dev --workspace=@jones/client",
     "lint": "eslint .",
+    "test": "npm run test --workspace=@jones/server",
     "build": "npm run build --workspace=@jones/shared && npm run build --workspace=@jones/server && npm run build --workspace=@jones/client",
     "build:shared": "npm run build --workspace=@jones/shared",
     "build:server": "npm run build --workspace=@jones/server",

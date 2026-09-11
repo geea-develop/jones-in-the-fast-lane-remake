@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GameState, GoalSelection, Difficulty, DIFFICULTY_GOALS } from "@jones/shared";
 import { createGame, loadGame } from "@/lib/api";
+import { getActiveOfflineGameId, setActiveOfflineGameId } from "@/lib/local-engine";
 import GameBoard from "@/components/GameBoard";
 import { useToasts, ToastContainer } from "@/components/Toast";
 import { assetPath } from "@/lib/assets";
@@ -11,6 +12,7 @@ export default function Home() {
   const [game, setGame] = useState<GameState | null>(null);
   const [playerName, setPlayerName] = useState("");
   const [gameId, setGameId] = useState("");
+  const [offline, setOffline] = useState(false);
   const { toasts, addToast, dismissToast } = useToasts();
   const [goalSelection, setGoalSelection] = useState<GoalSelection>({
     money: true,
@@ -20,16 +22,18 @@ export default function Home() {
     difficulty: "medium",
   });
 
-  // Auto-resume on mount
+  // Auto-resume on mount. Prefer an active offline game (fully local, always
+  // available with no internet); otherwise fall back to the online session id.
   useEffect(() => {
     let cancelled = false;
-    const savedId = sessionStorage.getItem("jones_game_id");
+    const offlineId = getActiveOfflineGameId();
+    const savedId = offlineId || sessionStorage.getItem("jones_game_id");
     if (savedId) {
       loadGame(savedId)
         .then((g) => {
           if (!cancelled && g && g.status === "in_progress") {
             setGame(g);
-            addToast("Game resumed from last session.", "info");
+            addToast(offlineId ? "Offline game resumed." : "Game resumed from last session.", "info");
           }
         })
         .catch((err) => {
@@ -50,10 +54,10 @@ export default function Home() {
 
   async function handleNewGame() {
     try {
-      const g = await createGame({ playerName: playerName || "Player", goalSelection });
+      const g = await createGame({ playerName: playerName || "Player", goalSelection, offline });
       setGame(g);
       sessionStorage.setItem("jones_game_id", g.id);
-      addToast("New game started! Good luck!", "success");
+      addToast(offline ? "Offline game started! No internet needed." : "New game started! Good luck!", "success");
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Could not start the game. Please try again.", "error");
     }
@@ -74,6 +78,7 @@ export default function Home() {
   const handleRestart = useCallback(() => {
     setGame(null);
     sessionStorage.removeItem("jones_game_id");
+    setActiveOfflineGameId(null);
   }, []);
 
   // Game Over screen
@@ -115,7 +120,7 @@ export default function Home() {
           </div>
         </div>
         <button
-          onClick={() => { setGame(null); sessionStorage.removeItem("jones_game_id"); }}
+          onClick={() => { setGame(null); sessionStorage.removeItem("jones_game_id"); setActiveOfflineGameId(null); }}
           className="retro-btn mt-6 px-6 py-3 bg-green-700 hover:bg-green-800 text-lg"
         >
           ▶ PLAY AGAIN
@@ -176,6 +181,38 @@ export default function Home() {
           </div>
           <p className="text-xs text-gray-500 mt-2 font-mono">
             💰${DIFFICULTY_GOALS[goalSelection.difficulty].money} | 🎓{DIFFICULTY_GOALS[goalSelection.difficulty].education} | 💼{DIFFICULTY_GOALS[goalSelection.difficulty].career} | 😊{DIFFICULTY_GOALS[goalSelection.difficulty].happiness}
+          </p>
+        </div>
+
+        {/* Mode: Online (server) vs Offline (device-only) */}
+        <div className="text-left">
+          <label className="pixel-text text-[8px] text-gray-400 block mb-2">MODE</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setOffline(false)}
+              className={`retro-btn uppercase ${
+                !offline
+                  ? "bg-cyan-700 border-cyan-500 text-white"
+                  : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+              }`}
+            >
+              🌐 Online
+            </button>
+            <button
+              onClick={() => setOffline(true)}
+              className={`retro-btn uppercase ${
+                offline
+                  ? "bg-cyan-700 border-cyan-500 text-white"
+                  : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+              }`}
+            >
+              📴 Offline
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 font-mono">
+            {offline
+              ? "Play vs Jones on this device — no internet needed."
+              : "Play vs Jones through the game server."}
           </p>
         </div>
 

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
+    "postbuild": "node scripts/generate-precache-manifest.cjs",
     "start": "next start"
   },
   "dependencies": {

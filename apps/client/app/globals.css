@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -41,7 +39,7 @@
 
   /* Pixel text for headers */
   .pixel-text {
-    font-family: 'Press Start 2P', monospace;
+    font-family: var(--font-pixel), 'Press Start 2P', monospace;
     letter-spacing: .04em;
   }
 
