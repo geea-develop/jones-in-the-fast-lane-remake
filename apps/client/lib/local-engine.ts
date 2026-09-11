@@ -24,6 +24,7 @@ import {
 const STORE_KEY = "jones_offline_games";
 // Marks which game ids are offline so lib/api.ts can route them locally.
 const INDEX_KEY = "jones_offline_index";
+const MAX_SAVED_GAMES = 10;
 
 type GameStore = Record<string, GameState>;
 
@@ -41,6 +42,27 @@ function readStore(): GameStore {
   }
 }
 
+function pruneStore(store: GameStore, keepId?: string): GameStore {
+  const entries = Object.entries(store);
+  if (entries.length <= MAX_SAVED_GAMES) return store;
+
+  // Sort by updatedAt descending (newest first)
+  entries.sort((a, b) => {
+    const timeA = new Date(a[1].updatedAt || 0).getTime();
+    const timeB = new Date(b[1].updatedAt || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const pruned: GameStore = {};
+  for (const [id, game] of entries.slice(0, MAX_SAVED_GAMES)) {
+    pruned[id] = game;
+  }
+  if (keepId && store[keepId] && !pruned[keepId]) {
+    pruned[keepId] = store[keepId];
+  }
+  return pruned;
+}
+
 function writeStore(store: GameStore): void {
   if (!hasStorage()) return;
   try {
@@ -54,7 +76,8 @@ function persist(game: GameState): GameState {
   game.updatedAt = new Date().toISOString();
   const store = readStore();
   store[game.id] = game;
-  writeStore(store);
+  const pruned = pruneStore(store, game.id);
+  writeStore(pruned);
   return game;
 }
 

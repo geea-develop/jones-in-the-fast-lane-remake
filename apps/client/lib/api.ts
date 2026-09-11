@@ -26,6 +26,9 @@ export async function createGame(req: CreateGameLocalRequest): Promise<GameState
     return local.createGame({ playerName: req.playerName, goalSelection: req.goalSelection });
   }
 
+  // Starting an online game — clear any active offline game ID so auto-resume won't prefer it
+  local.setActiveOfflineGameId(null);
+
   const res = await fetchWithTimeout(`${API_URL}/api/game`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
