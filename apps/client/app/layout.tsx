@@ -1,5 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
+import Analytics from "@/components/Analytics";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
+
+// Self-hosted retro font — bundled locally so the app needs no external font
+// CDN and works fully offline. (OFL-licensed Press Start 2P.)
+const pressStart2P = localFont({
+  src: "./fonts/PressStart2P-Regular.woff2",
+  weight: "400",
+  style: "normal",
+  display: "swap",
+  variable: "--font-pixel",
+});
 
 export const metadata: Metadata = {
   title: "Jones in the Fast Lane",
@@ -23,17 +36,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://static.cloudflareinsights.com`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
     `connect-src 'self' https://cloudflareinsights.com ${serverUrl}${isDev ? " http://localhost:3001" : ""}`,
-    "font-src 'self' https://fonts.gstatic.com",
+    "font-src 'self'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",
   ].join("; ") + ";";
 
   return (
-    <html lang="en">
+    <html lang="en" className={pressStart2P.variable}>
       <head>
         <meta httpEquiv="Content-Security-Policy" content={csp} />
         <link rel="manifest" href={`${basePath}/manifest.webmanifest`} />
@@ -54,11 +69,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {buildId} 🏃
           </span>
         </footer>
-        <script
-          type="module"
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "136e08eeda5c4767885f149528781334"}'
-        />
+        <Analytics />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
