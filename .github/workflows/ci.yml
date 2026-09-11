@@ -24,6 +24,13 @@ jobs:
       - name: Configure local test server
         run: cp apps/server/.env.example apps/server/.env
 
+      - name: Build shared package
+        # The @jones/server tests import @jones/shared from its built dist/
+        # output. On a clean CI checkout that output does not exist yet, so the
+        # server test must be preceded by building the shared workspace,
+        # otherwise it fails with "Cannot find package '@jones/shared/dist/index.js'".
+        run: npm run build:shared
+
       - name: Lint
         run: npm run lint
 
