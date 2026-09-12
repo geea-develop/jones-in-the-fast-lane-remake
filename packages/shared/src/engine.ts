@@ -11,9 +11,12 @@ import {
   JOBS,
   TIME_UNITS_PER_WEEK,
   WEEKLY_RENT,
+  BANK_TRANSFER_AMOUNT,
   FOOD_DECAY_PER_WEEK,
+  ENERGY_DECAY_PER_WEEK,
   HUNGER_ENERGY_PENALTY,
   LOW_ENERGY_FIRE_THRESHOLD,
+  WORK_MIN_ENERGY,
 } from "./game.js";
 import { GameEvent } from "./api.js";
 
@@ -66,8 +69,20 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
     return { game, error: "You need a job first! Visit the Employment Office." };
   }
 
-  if (actionId === "work" && player.energy < 15) {
+  if (actionId === "work" && player.energy < WORK_MIN_ENERGY) {
     return { game, error: "Too tired to work effectively. Rest first!" };
+  }
+
+  if (actionId === "pay_rent" && player.rentPaidThisWeek) {
+    return { game, error: "Rent is already paid for this week." };
+  }
+
+  if (actionId === "deposit" && player.money < BANK_TRANSFER_AMOUNT) {
+    return { game, error: `Need at least $${BANK_TRANSFER_AMOUNT} in cash to deposit.` };
+  }
+
+  if (actionId === "withdraw" && player.bankBalance <= 0) {
+    return { game, error: "Your bank account is empty." };
   }
 
   if (player.timeUnits < action.timeCost) {
@@ -146,7 +161,10 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
     }
 
     case "pay_rent": {
-      message = `Paid rent ($${WEEKLY_RENT}).`;
+      // $50 was already deducted as the action's moneyCost. Mark rent as settled
+      // so endWeek skips its automatic deduction (no more double-charging).
+      player.rentPaidThisWeek = true;
+      message = `Paid rent ($${WEEKLY_RENT}) early. No rent will be deducted at week's end.`;
       break;
     }
 
@@ -186,13 +204,19 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
     }
 
     case "deposit": {
-      // Simplified: no separate bank balance for now
-      message = "Money deposited safely.";
+      // Move a fixed chunk of cash into the bank, where it's safe from muggings.
+      player.money -= BANK_TRANSFER_AMOUNT;
+      player.bankBalance += BANK_TRANSFER_AMOUNT;
+      message = `Deposited $${BANK_TRANSFER_AMOUNT}. Bank balance: $${player.bankBalance} (safe from muggers).`;
       break;
     }
 
     case "withdraw": {
-      message = "Withdrew money from the bank.";
+      // Take out a fixed chunk (or whatever's left if less than the chunk).
+      const amount = Math.min(BANK_TRANSFER_AMOUNT, player.bankBalance);
+      player.bankBalance -= amount;
+      player.money += amount;
+      message = `Withdrew $${amount}. Bank balance: $${player.bankBalance}.`;
       break;
     }
   }
@@ -312,12 +336,16 @@ export function endWeek(game: GameState): { game: GameState; events: GameEvent[]
     events.push({ type: "hunger", message: `⚠️ Getting hungry (food: ${game.player.food}). Buy food soon!` });
   }
 
-  // Deduct rent
-  game.player.money -= WEEKLY_RENT;
-  events.push({ type: "rent_due", message: `Rent deducted: -$${WEEKLY_RENT}` });
+  // Deduct rent — unless it was already paid manually at the Rent Office this week.
+  if (game.player.rentPaidThisWeek) {
+    events.push({ type: "rent_due", message: `Rent already paid this week. -$0` });
+  } else {
+    game.player.money -= WEEKLY_RENT;
+    events.push({ type: "rent_due", message: `Rent deducted: -$${WEEKLY_RENT}` });
+  }
 
   // Energy decay
-  game.player.energy = Math.max(0, game.player.energy - 8);
+  game.player.energy = Math.max(0, game.player.energy - ENERGY_DECAY_PER_WEEK);
 
   // Happiness decay
   game.player.happiness = Math.max(0, game.player.happiness - 4);
@@ -336,6 +364,21 @@ export function endWeek(game: GameState): { game: GameState; events: GameEvent[]
     events.push({ type: "rent_due", message: "💸 Can't afford rent! Happiness -5" });
   }
 
+  // Hard-difficulty survival: neglecting food or rest is fatal.
+  // Checked after decay/penalties are applied so a week that drains the last
+  // point of food or energy ends the game immediately.
+  if (game.goalSelection.difficulty === "hard" && (game.player.food <= 0 || game.player.energy <= 0)) {
+    game.status = "lost";
+    const cause = game.player.food <= 0 && game.player.energy <= 0
+      ? "starvation and exhaustion"
+      : game.player.food <= 0
+        ? "starvation"
+        : "exhaustion";
+    events.push({ type: "death", message: `💀 You collapsed from ${cause}. Game over.` });
+    game.lastEvent = `Died from ${cause}.`;
+    return { game, events };
+  }
+
   // Random event
   const randomEvent = rollRandomEvent(game.player);
   if (randomEvent) {
@@ -346,6 +389,7 @@ export function endWeek(game: GameState): { game: GameState; events: GameEvent[]
   // Advance week
   game.week += 1;
   game.player.timeUnits = TIME_UNITS_PER_WEEK;
+  game.player.rentPaidThisWeek = false; // rent comes due again next week
 
   events.push({ type: "week_start", message: `📅 Week ${game.week} begins. Time units refreshed.` });
 

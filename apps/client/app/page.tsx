@@ -84,6 +84,7 @@ export default function Home() {
   // Game Over screen
   if (game && game.status !== "in_progress") {
     const won = game.status === "won";
+    const died = !won && typeof game.lastEvent === "string" && game.lastEvent.startsWith("Died from");
     return (
       <main className="max-w-4xl mx-auto p-8 text-center">
         {/* Winner/Loser character display */}
@@ -106,7 +107,9 @@ export default function Home() {
         <p className="text-gray-400 mb-4">
           {won
             ? "You reached all your goals before Jones!"
-            : "Jones beat you to the finish line."}
+            : died
+              ? game.lastEvent
+              : "Jones beat you to the finish line."}
         </p>
         <p className="pixel-text text-[10px] text-gray-500">WEEK {game.week}</p>
         <div className="grid grid-cols-2 gap-4 mt-4 max-w-md mx-auto text-left">

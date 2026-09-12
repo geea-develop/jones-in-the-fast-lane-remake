@@ -33,6 +33,6 @@ export interface EndWeekResponse {
 }
 
 export interface GameEvent {
-  type: "rent_due" | "fired" | "promotion" | "week_start" | "goal_reached" | "game_over" | "hunger" | "random_event" | "starving" | "jones_turn";
+  type: "rent_due" | "fired" | "promotion" | "week_start" | "goal_reached" | "game_over" | "death" | "hunger" | "random_event" | "starving" | "jones_turn";
   message: string;
 }

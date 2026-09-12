@@ -43,6 +43,8 @@ export interface Player {
   position: LocationId;
   job: Job | null;
   turnsEmployed: number; // weeks at current job (fired if 0 energy while employed)
+  bankBalance: number;   // money saved in the bank — safe from muggings
+  rentPaidThisWeek: boolean; // true once rent is paid manually; skips the end-week auto-deduct
 }
 
 export interface Goals {
@@ -83,6 +85,9 @@ export const DEFAULT_GOAL_SELECTION: GoalSelection = {
 
 export const TIME_UNITS_PER_WEEK = 10;
 export const WEEKLY_RENT = 50;
+export const BANK_TRANSFER_AMOUNT = 50;    // fixed amount moved per deposit/withdraw
 export const FOOD_DECAY_PER_WEEK = 25;    // food drops 25 per week
+export const ENERGY_DECAY_PER_WEEK = 8;   // energy drops 8 per week (before other penalties)
 export const HUNGER_ENERGY_PENALTY = 30;   // lose 30 energy if food hits 0
 export const LOW_ENERGY_FIRE_THRESHOLD = 10; // get fired if energy below this
+export const WORK_MIN_ENERGY = 15;           // too tired to work effectively below this
