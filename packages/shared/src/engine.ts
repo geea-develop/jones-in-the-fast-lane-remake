@@ -12,6 +12,7 @@ import {
   TIME_UNITS_PER_WEEK,
   WEEKLY_RENT,
   BANK_TRANSFER_AMOUNT,
+  BANK_INTEREST_RATE,
   FOOD_DECAY_PER_WEEK,
   ENERGY_DECAY_PER_WEEK,
   HUNGER_ENERGY_PENALTY,
@@ -162,9 +163,10 @@ export function performAction(game: GameState, actionId: ActionId): { game: Game
 
     case "pay_rent": {
       // $50 was already deducted as the action's moneyCost. Mark rent as settled
-      // so endWeek skips its automatic deduction (no more double-charging).
+      // so endWeek skips its automatic deduction (no more double-charging) and
+      // shields the player from the "rent increase" surprise bill this week.
       player.rentPaidThisWeek = true;
-      message = `Paid rent ($${WEEKLY_RENT}) early. No rent will be deducted at week's end.`;
+      message = `Paid rent ($${WEEKLY_RENT}) early. No end-of-week rent, and you're safe from a rent hike this week.`;
       break;
     }
 
@@ -306,8 +308,9 @@ const RANDOM_EVENTS: RandomEvent[] = [
   },
 ];
 
-function rollRandomEvent(player: Player): GameEvent | null {
+function rollRandomEvent(player: Player, skip: Set<string> = new Set()): GameEvent | null {
   for (const event of RANDOM_EVENTS) {
+    if (skip.has(event.name)) continue;
     if (Math.random() < event.chance) {
       const message = event.apply(player);
       if (message) {
@@ -364,6 +367,15 @@ export function endWeek(game: GameState): { game: GameState; events: GameEvent[]
     events.push({ type: "rent_due", message: "💸 Can't afford rent! Happiness -5" });
   }
 
+  // Bank interest: reward saving. Paid on the balance held at week's end.
+  if (game.player.bankBalance > 0) {
+    const interest = Math.round(game.player.bankBalance * BANK_INTEREST_RATE);
+    if (interest > 0) {
+      game.player.bankBalance += interest;
+      events.push({ type: "bank_interest", message: `🏦 Bank interest: +$${interest} (balance $${game.player.bankBalance}).` });
+    }
+  }
+
   // Hard-difficulty survival: neglecting food or rest is fatal.
   // Checked after decay/penalties are applied so a week that drains the last
   // point of food or energy ends the game immediately.
@@ -379,8 +391,11 @@ export function endWeek(game: GameState): { game: GameState; events: GameEvent[]
     return { game, events };
   }
 
-  // Random event
-  const randomEvent = rollRandomEvent(game.player);
+  // Random event — paying rent early at the Rent Office shields you from the
+  // surprise "rent increase" bill this week.
+  const skipEvents = new Set<string>();
+  if (game.player.rentPaidThisWeek) skipEvents.add("rent_increase");
+  const randomEvent = rollRandomEvent(game.player, skipEvents);
   if (randomEvent) {
     events.push(randomEvent);
     game.lastEvent = randomEvent.message;
