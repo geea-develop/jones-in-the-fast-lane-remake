@@ -86,6 +86,7 @@ export const DEFAULT_GOAL_SELECTION: GoalSelection = {
 export const TIME_UNITS_PER_WEEK = 10;
 export const WEEKLY_RENT = 50;
 export const BANK_TRANSFER_AMOUNT = 50;    // fixed amount moved per deposit/withdraw
+export const BANK_INTEREST_RATE = 0.05;    // 5% interest paid on the bank balance each week
 export const FOOD_DECAY_PER_WEEK = 25;    // food drops 25 per week
 export const ENERGY_DECAY_PER_WEEK = 8;   // energy drops 8 per week (before other penalties)
 export const HUNGER_ENERGY_PENALTY = 30;   // lose 30 energy if food hits 0

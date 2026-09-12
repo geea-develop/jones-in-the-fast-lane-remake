@@ -7,6 +7,7 @@ import {
   endWeek,
   WEEKLY_RENT,
   BANK_TRANSFER_AMOUNT,
+  BANK_INTEREST_RATE,
   GameState,
 } from "@jones/shared";
 
@@ -114,5 +115,45 @@ test("banked money is safe from muggings (only cash on hand is at risk)", () => 
     game.player.money += 100; // fresh cash to be muggable
     endWeek(game);
     assert.ok(game.player.bankBalance >= bankedBefore, "bank balance must never be reduced by a mugging");
+  }
+});
+
+test("bank balance earns interest each week", () => {
+  const game = newGame();
+  game.player.bankBalance = 200;
+  const expectedInterest = Math.round(200 * BANK_INTEREST_RATE);
+
+  const { events } = endWeek(game);
+
+  assert.equal(game.player.bankBalance, 200 + expectedInterest, "interest credited to bank balance");
+  const interestEvent = events.find((e) => e.type === "bank_interest");
+  assert.ok(interestEvent, "a bank_interest event should be emitted");
+  assert.match(interestEvent!.message, new RegExp(`\\+\\$${expectedInterest}`), "event states the interest amount");
+});
+
+test("no interest event when the bank balance is zero", () => {
+  const game = newGame();
+  assert.equal(game.player.bankBalance, 0);
+
+  const { events } = endWeek(game);
+
+  assert.equal(game.player.bankBalance, 0, "balance stays zero");
+  assert.equal(events.some((e) => e.type === "bank_interest"), false, "no interest event with an empty account");
+});
+
+test("paying rent early shields the player from the rent-increase event", () => {
+  // rent_increase is a random event (5% chance). When rent is paid early it must
+  // NEVER fire. Run many weeks with rent paid each week and assert it never appears.
+  const game = newGame();
+  // Keep the player alive and solvent so the loop can run many weeks.
+  for (let i = 0; i < 400 && game.status === "in_progress"; i++) {
+    game.player.food = 100;
+    game.player.energy = 100;
+    game.player.money += 200;
+    game.player.rentPaidThisWeek = true; // simulate having paid rent early this week
+
+    const { events } = endWeek(game);
+    const hit = events.some((e) => e.type === "random_event" && /rent increase|extra \$25/i.test(e.message));
+    assert.equal(hit, false, "rent_increase must never fire in a week rent was paid early");
   }
 });

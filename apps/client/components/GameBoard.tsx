@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost, GameEvent, FOOD_DECAY_PER_WEEK, ENERGY_DECAY_PER_WEEK, WORK_MIN_ENERGY, BANK_TRANSFER_AMOUNT } from "@jones/shared";
+import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost, GameEvent, FOOD_DECAY_PER_WEEK, ENERGY_DECAY_PER_WEEK, WORK_MIN_ENERGY, BANK_TRANSFER_AMOUNT, JOBS } from "@jones/shared";
 import { moveToLocation, performAction, endWeek } from "@/lib/api";
 import { LocationIcon } from "./LocationIcons";
 import { assetPath } from "@/lib/assets";
@@ -192,6 +192,7 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
                 happiness={game.player.happiness}
                 bankBalance={game.player.bankBalance}
                 rentPaidThisWeek={game.player.rentPaidThisWeek}
+                currentJobSalary={game.player.job?.salary ?? 0}
                 onAction={(id) => setPendingAction(id)}
                 disabled={isSubmitting}
               />
@@ -356,7 +357,7 @@ const ACTION_CATEGORIES: Record<string, { emoji: string; color: string }> = {
   withdraw: { emoji: "🏦", color: "border-red-500/60 hover:border-red-400" },
 };
 
-const ActionButton = memo(function ActionButton({ action, timeUnits, money, hasJob, energy, food, education, happiness, bankBalance, rentPaidThisWeek, onAction, disabled: isSubmitting }: {
+const ActionButton = memo(function ActionButton({ action, timeUnits, money, hasJob, energy, food, education, happiness, bankBalance, rentPaidThisWeek, currentJobSalary, onAction, disabled: isSubmitting }: {
   action: typeof ACTIONS[0];
   timeUnits: number;
   money: number;
@@ -367,6 +368,7 @@ const ActionButton = memo(function ActionButton({ action, timeUnits, money, hasJ
   happiness: number;
   bankBalance: number;
   rentPaidThisWeek: boolean;
+  currentJobSalary: number;
   onAction: (id: ActionId) => void;
   disabled: boolean;
 }) {
@@ -381,6 +383,14 @@ const ActionButton = memo(function ActionButton({ action, timeUnits, money, hasJ
       if (!hasJob) blockReason = "You need a job first — visit ACNE Employment to get hired.";
       else if (energy < WORK_MIN_ENERGY) blockReason = "Too tired to work — rest to recover energy first.";
       break;
+    case "browse_jobs": {
+      // Pointless if you already hold the best job you currently qualify for.
+      const bestQualified = JOBS.filter((j) => education >= j.educationRequired).at(-1);
+      if (hasJob && bestQualified && bestQualified.salary <= currentJobSalary) {
+        blockReason = "No better jobs yet — study to qualify for higher positions.";
+      }
+      break;
+    }
     case "rest":
       if (energy >= 100) blockReason = "Energy is already full.";
       break;

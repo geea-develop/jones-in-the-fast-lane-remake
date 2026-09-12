@@ -331,3 +331,104 @@ test.describe("Duplicate Click Protection", () => {
     expect(endWeekCallCount).toBe(1);
   });
 });
+
+test.describe("Action button gating", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      sessionStorage.clear();
+      localStorage.clear();
+    });
+    await page.reload();
+  });
+
+  test("Work is disabled while unemployed and enabled after getting hired", async ({ page }) => {
+    // Start a fresh offline game (deterministic, no server). Player starts jobless.
+    await page.getByRole("button", { name: /Offline/ }).click();
+    await page.getByRole("button", { name: /START GAME/ }).click();
+    await expect(page.getByText(/^GOALS$/)).toBeVisible();
+
+    // Travel to the Factory — Work should be disabled (no job yet).
+    await page.getByRole("button", { name: /Factory/ }).click();
+    const workBtn = page.getByRole("button", { name: "Work Shift action" });
+    await expect(workBtn).toBeDisabled();
+    await expect(workBtn).toContainText(/ACNE Employment/i);
+
+    // Get hired at ACNE Employment.
+    await page.getByRole("button", { name: /ACNE Employment/ }).click();
+    await page.getByRole("button", { name: "Browse Jobs action" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "DO IT" }).click();
+
+    // Back to the Factory — Work is now enabled.
+    await page.getByRole("button", { name: /Factory/ }).click();
+    await expect(page.getByRole("button", { name: "Work Shift action" })).toBeEnabled();
+  });
+
+  test("Rest is disabled at full energy on a fresh game", async ({ page }) => {
+    await page.getByRole("button", { name: /Offline/ }).click();
+    await page.getByRole("button", { name: /START GAME/ }).click();
+    await expect(page.getByText(/^GOALS$/)).toBeVisible();
+
+    // Player starts at Home with full energy — Rest has no effect and is disabled.
+    const restBtn = page.getByRole("button", { name: "Rest action" });
+    await expect(restBtn).toBeDisabled();
+    await expect(restBtn).toContainText(/Energy is already full/i);
+  });
+});
+
+test.describe("Survival warnings", () => {
+  // Seed a crafted offline game directly into localStorage so the banner state
+  // is deterministic (no reliance on random events). Auto-resume then loads it.
+  async function seedOfflineGame(page: import("@playwright/test").Page, overrides: {
+    difficulty: "easy" | "medium" | "hard";
+    food: number;
+    energy: number;
+  }) {
+    const seed = {
+      difficulty: overrides.difficulty,
+      food: overrides.food,
+      energy: overrides.energy,
+    };
+    await page.addInitScript((s) => {
+      const id = "e2e-seeded-game";
+      const player = {
+        id: "p1", name: "E2E", money: 100, education: 0, career: 0,
+        happiness: 50, energy: s.energy, food: s.food, timeUnits: 10,
+        position: "home", job: null, turnsEmployed: 0, bankBalance: 0,
+        rentPaidThisWeek: false,
+      };
+      const jones = { ...player, id: "jones", name: "Jones" };
+      const goals = s.difficulty === "hard"
+        ? { money: 1000, education: 80, career: 80, happiness: 80 }
+        : { money: 300, education: 40, career: 40, happiness: 50 };
+      const game = {
+        id, player, aiJones: jones, week: 3, goals,
+        goalSelection: { money: true, education: true, career: true, happiness: true, difficulty: s.difficulty },
+        status: "in_progress", lastEvent: null,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("jones_offline_games", JSON.stringify({ [id]: game }));
+      localStorage.setItem("jones_offline_index", id);
+    }, seed);
+    await page.goto("/");
+  }
+
+  test("hard difficulty shows the death-risk banner when a vital will run out", async ({ page }) => {
+    // food 10 - 25 decay <= 0 => fatal next end-week on hard.
+    await seedOfflineGame(page, { difficulty: "hard", food: 10, energy: 100 });
+
+    await expect(page.getByText(/^GOALS$/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/DANGER: ending this week will kill you/i)).toBeVisible();
+    // The End Week button reflects the fatal risk.
+    await expect(page.getByRole("button", { name: /END WEEK/ })).toContainText("💀");
+  });
+
+  test("easy difficulty shows a non-fatal low-vitals warning (no death)", async ({ page }) => {
+    await seedOfflineGame(page, { difficulty: "easy", food: 10, energy: 100 });
+
+    await expect(page.getByText(/^GOALS$/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/LOW: your food will run out this week/i)).toBeVisible();
+    // No death threat on easy.
+    await expect(page.getByText(/DANGER: ending this week will kill you/i)).toHaveCount(0);
+  });
+});
