@@ -31,22 +31,27 @@ test("pay_rent does not double-charge: manual payment skips the end-week deducti
   assert.equal(game.player.rentPaidThisWeek, true);
   assert.equal(game.player.money, startMoney - WEEKLY_RENT, "manual payment costs one week's rent");
 
-  const moneyBeforeEndWeek = game.player.money;
-  endWeek(game);
+  const { events } = endWeek(game);
 
-  // End-week must NOT deduct rent again.
-  assert.equal(game.player.money, moneyBeforeEndWeek, "rent must not be charged twice in the same week");
+  // End-week must NOT deduct rent again. Assert on the deterministic rent_due
+  // event rather than the money total, which random events can also change.
+  const rentEvent = events.find((e) => e.type === "rent_due");
+  assert.ok(rentEvent, "a rent_due event should be emitted");
+  assert.match(rentEvent!.message, /already paid/i, "rent must not be charged twice in the same week");
   // Flag resets for the new week.
   assert.equal(game.player.rentPaidThisWeek, false, "rent flag resets after the week advances");
 });
 
 test("without manual payment, rent is deducted once at end of week", () => {
   const game = newGame();
-  const startMoney = game.player.money;
 
-  endWeek(game);
+  const { events } = endWeek(game);
 
-  assert.equal(game.player.money, startMoney - WEEKLY_RENT, "rent deducted once automatically");
+  // Assert on the rent_due event (deterministic) rather than the money total,
+  // which random events (mugging, found money, etc.) can also affect.
+  const rentEvent = events.find((e) => e.type === "rent_due");
+  assert.ok(rentEvent, "a rent_due event should be emitted");
+  assert.equal(rentEvent!.message, `Rent deducted: -$${WEEKLY_RENT}`, "rent deducted once automatically");
 });
 
 test("paying rent twice in one week is rejected (no wasted money)", () => {
