@@ -13,3 +13,6 @@ generated-assets/
 # Playwright output
 playwright-report/
 test-results/
+
+# Kiro internal spec files (not for public repo)
+.kiro/

@@ -568,37 +568,53 @@ const Tile = memo(function Tile({ loc, popoverSide, popoverDirection, playerPosi
   // Color-code the cost
   const costColor = isHere ? "" : cost <= 1 ? "text-green-400" : cost <= 2 ? "text-yellow-400" : "text-orange-400";
 
+  // The wrapper carries the directional `popover-*` classes; CSS keys the popover open state
+  // off the wrapper's `:hover`/`:focus-within` (see globals.css) so disabled tiles (HERE /
+  // unreachable) still reveal their popover on hover in every layout. Placement is CSS-first:
+  // directional classes + viewport-relative max-width/max-height keep popovers inside the
+  // viewport at supported sizes, with no JS repositioning.
   return (
-    <button
-      onClick={handleClick}
-      disabled={!canMove}
-      className={`retro-tile ${popoverSide ? `popover-${popoverSide}` : ""} ${popoverDirection ? `popover-${popoverDirection}` : ""} relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all duration-150 ${
-        isHere
-          ? "border-cyan-400 bg-cyan-900/50 ring-2 ring-cyan-400/30 scale-[1.03]"
-          : canMove
-          ? "border-gray-600 bg-[#1a1a2e]/90 hover:border-green-400 hover:bg-[#1a2a3e] cursor-pointer hover:scale-[1.04] active:scale-[0.97]"
-          : "border-gray-700/50 bg-gray-900/40 opacity-40 cursor-default"
-      }`}
-      title={`${loc.name} — ${isHere ? "You are here" : `Move cost: ${cost}h`}`}
+    <span
+      className={`tile-wrap ${popoverSide ? `popover-${popoverSide}` : ""} ${popoverDirection ? `popover-${popoverDirection}` : ""}`}
     >
-      <span className="location-icon-frame"><LocationIcon locationId={loc.id} size={64} /></span>
-      <span className="mt-1 max-w-[72px] whitespace-normal text-center text-[7px] font-bold leading-tight pixel-text text-[#fff3c4] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] sm:max-w-[132px] sm:whitespace-nowrap">
-        {loc.name}
-      </span>
-      {!isHere && <span className={`text-[11px] font-bold font-mono mt-0.5 ${costColor}`}>{cost}h</span>}
-      {isHere && <span className="text-[8px] font-mono text-cyan-300 mt-0.5">📍 HERE</span>}
-      <span className="location-popover absolute left-1/2 top-full z-30 mt-2 w-44 -translate-x-1/2 rounded border border-[#8a7a4c] bg-[#202b47] p-2.5 text-left text-[10px] leading-tight text-[#f7f0d3] shadow-xl">
-        <strong className="block text-[#ffe39b] text-[11px]">{loc.name}</strong>
-        <span className="mt-1 block text-slate-300">{loc.description}</span>
-        {!isHere && <span className="mt-1.5 block font-mono text-cyan-300 font-bold">MOVE: {cost}h</span>}
-      </span>
-      {/* Player/Jones character markers */}
-      {(isHere || isJones) && (
-        <div className="absolute -top-3 -right-3 flex gap-0.5">
-          {isHere && <img src={assetPath("assets/characters/player.png")} alt="Player" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(0,255,255,0.7)]" style={{ imageRendering: "pixelated" }} />}
-          {isJones && <img src={assetPath("assets/characters/jones.png")} alt="Jones" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(255,0,0,0.7)]" style={{ imageRendering: "pixelated" }} />}
-        </div>
-      )}
-    </button>
+      <button
+        onClick={handleClick}
+        disabled={!canMove}
+        className={`retro-tile relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all duration-150 ${
+          isHere
+            ? "border-cyan-400 bg-cyan-900/50 ring-2 ring-cyan-400/30 scale-[1.03]"
+            : canMove
+            ? "border-gray-600 bg-[#1a1a2e]/90 hover:border-green-400 hover:bg-[#1a2a3e] cursor-pointer hover:scale-[1.04] active:scale-[0.97]"
+            : "border-gray-700/50 bg-gray-900/40 opacity-40 cursor-default"
+        }`}
+        title={`${loc.name} — ${isHere ? "You are here" : `Move cost: ${cost}h`}`}
+      >
+        <span className="location-icon-frame"><LocationIcon locationId={loc.id} size={64} /></span>
+        <span className="mt-1 max-w-[72px] whitespace-normal text-center text-[7px] font-bold leading-tight pixel-text text-[#fff3c4] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] sm:max-w-[132px] sm:whitespace-nowrap">
+          {loc.name}
+        </span>
+        {!isHere && <span className={`text-[11px] font-bold font-mono mt-0.5 ${costColor}`}>{cost}h</span>}
+        {isHere && <span className="text-[8px] font-mono text-cyan-300 mt-0.5">📍 HERE</span>}
+        {/*
+          Popover stays a DESCENDANT of the `.retro-tile` button (its positioning context) so the
+          Property-10 test's `tile.locator('.location-popover')` still finds it. What changed for
+          Bug 1 is the OPEN TRIGGER: hover/focus handlers + the CSS open-state selector live on
+          the non-disabled `.tile-wrap` wrapper, so disabled tiles (HERE / unreachable) still open
+          AND get clamped even though React events don't fire on the disabled button itself.
+        */}
+        <span className="location-popover absolute left-1/2 top-full z-30 mt-2 w-44 -translate-x-1/2 rounded border border-[#8a7a4c] bg-[#202b47] p-2.5 text-left text-[10px] leading-tight text-[#f7f0d3] shadow-xl">
+          <strong className="block text-[#ffe39b] text-[11px]">{loc.name}</strong>
+          <span className="mt-1 block text-slate-300">{loc.description}</span>
+          {!isHere && <span className="mt-1.5 block font-mono text-cyan-300 font-bold">MOVE: {cost}h</span>}
+        </span>
+        {/* Player/Jones character markers */}
+        {(isHere || isJones) && (
+          <div className="absolute -top-3 -right-3 flex gap-0.5">
+            {isHere && <img src={assetPath("assets/characters/player.png")} alt="Player" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(0,255,255,0.7)]" style={{ imageRendering: "pixelated" }} />}
+            {isJones && <img src={assetPath("assets/characters/jones.png")} alt="Jones" className="w-7 h-11 object-contain drop-shadow-[0_0_5px_rgba(255,0,0,0.7)]" style={{ imageRendering: "pixelated" }} />}
+          </div>
+        )}
+      </button>
+    </span>
   );
 });

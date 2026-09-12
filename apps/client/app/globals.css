@@ -55,14 +55,24 @@
   .metric-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; margin-right: .25rem; vertical-align: middle; transform: translateY(-1px); border: 1px solid currentColor; border-radius: 3px; font: 700 9px/1 "Courier New", monospace; }
   .game-dialog { animation: dialog-in .14s ease-out both; }
   @keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  /*
+   * Popover placement is CSS-only. Directional classes (`popover-left/right/up`) plus the
+   * viewport-relative size caps in the landscape media query keep every popover inside the
+   * viewport at supported sizes — there is no JS repositioning.
+   */
   .location-popover { opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; }
-  .retro-tile:hover .location-popover, .retro-tile:focus-visible .location-popover { opacity: 1; transform: translateY(0); }
-  .retro-tile.popover-right .location-popover { left: 100%; transform: translate(0, 4px); }
-  .retro-tile.popover-left .location-popover { left: auto; right: 100%; transform: translate(0, 4px); }
-  .retro-tile.popover-up .location-popover { top: auto; bottom: 100%; margin-top: 0; margin-bottom: .5rem; transform: translate(0, 4px); }
-  .retro-tile.popover-right:hover .location-popover, .retro-tile.popover-right:focus-visible .location-popover,
-  .retro-tile.popover-left:hover .location-popover, .retro-tile.popover-left:focus-visible .location-popover,
-  .retro-tile.popover-up:hover .location-popover, .retro-tile.popover-up:focus-visible .location-popover { transform: translate(0, 0); }
+  /*
+   * Open state keys off the `.tile-wrap` wrapper (which is never disabled), NOT the inner
+   * `.retro-tile` button — CSS `:hover`/`:focus-within` reveal the popover, so disabled tiles
+   * (HERE / unreachable) still show their popover on hover in every layout.
+   */
+  .tile-wrap:hover .location-popover, .tile-wrap:focus-within .location-popover { opacity: 1; transform: translateX(-50%); }
+  .tile-wrap.popover-right .location-popover { left: 100%; transform: translateY(4px); }
+  .tile-wrap.popover-left .location-popover { left: auto; right: 100%; transform: translateY(4px); }
+  .tile-wrap.popover-up .location-popover { top: auto; bottom: 100%; margin-top: 0; margin-bottom: .5rem; transform: translateX(-50%); }
+  .tile-wrap.popover-right:hover .location-popover, .tile-wrap.popover-right:focus-within .location-popover,
+  .tile-wrap.popover-left:hover .location-popover, .tile-wrap.popover-left:focus-within .location-popover { opacity: 1; transform: translateY(4px); }
+  .tile-wrap.popover-up:hover .location-popover, .tile-wrap.popover-up:focus-within .location-popover { opacity: 1; transform: translateX(-50%); }
   @media (max-width: 1279px) { .game-shell { width: min(100% - 24px, 1080px); padding-top: 12px; } }
   @media (max-width: 900px) { .game-shell { width: min(100% - 20px, 680px); padding-top: 10px; } }
   @media (max-width: 640px) {
@@ -71,6 +81,592 @@
     .board-window > div { min-height: 0; }
     .location-icon-frame { width: 44px; height: 42px; }
     .location-icon-frame img { width: 42px; height: 42px; }
+  }
+
+  /*
+   * Landscape_Mobile breakpoint — the single source of the landscape threshold constant.
+   *
+   * Activation condition (all three must hold):
+   *   - orientation: landscape  → viewport is wider than tall (a rotated phone).
+   *   - max-height: 600px       → the Landscape_Threshold. Phone landscape heights cluster
+   *                               well below 500px; a 600px ceiling captures the whole
+   *                               phone-landscape population (with margin for browser chrome)
+   *                               while excluding laptops/desktops (usable height ≥700px) and
+   *                               tablets in landscape (~768-834px), which keep their layouts.
+   *   - max-width: 1279px       → one pixel below Tailwind's `xl` (1280px), so a landscape
+   *                               window at or above the desktop breakpoint still gets the
+   *                               Desktop two-column layout regardless of orientation (R1.4),
+   *                               and this guard aligns exactly with the `xl:` grid boundary.
+   *
+   * This is the one place the 600px / 1279px thresholds live; every later landscape CSS rule
+   * (shell re-flow, height-driven board, tile floors, header/actions, stats scroll, dialog
+   * cap, popover placement) is added inside this block.
+   *
+   * Requirements: 1.1, 1.4
+   */
+  @media (orientation: landscape) and (max-height: 600px) and (max-width: 1279px) {
+    /*
+     * Task 2.1 — Shell re-flow into a board-beside-stats row (Requirements: 3.1).
+     *
+     * The existing JSX gives `.game-shell` two direct children:
+     *   1. the LEFT wrapper (`.flex.flex-col.min-h-0`) holding [week header, board, actions]
+     *   2. the RIGHT stats wrapper (`.flex.flex-col.overflow-y-auto`)
+     * plus the dialog/popover overlays (position: fixed, so they don't take grid tracks).
+     *
+     * To place the week header as a full-width top row spanning BOTH columns while the
+     * board sits beside the stats — without touching the JSX — the LEFT wrapper is set to
+     * `display: contents`. That dissolves the wrapper box and promotes its three children
+     * (header, board-window, actions panel) to direct grid items of `.game-shell`, so the
+     * grid can position them independently alongside the stats wrapper.
+     */
+    /*
+     * Selector is `.game-shell.grid` (the JSX renders `class="game-shell grid …"`),
+     * NOT bare `.game-shell`. This is deliberate and load-bearing for R3.1:
+     *
+     * The JSX applies the Tailwind utilities `grid-cols-1` and `gap-4` to the same
+     * element. `.grid-cols-1` (specificity 0,1,0) is emitted AFTER this media query
+     * in the compiled stylesheet, so against a bare `.game-shell` (also 0,1,0) it
+     * wins on source order — the shell then resolves as a SINGLE explicit `1fr`
+     * column. The stats child is placed at `grid-column: 2`, which spawns an
+     * implicit `auto` (content-min) second column. The result is exactly the
+     * measured defect: the explicit `1fr` track absorbs all free space (board region
+     * ~85-95% of vw at larger widths) while stats collapses to its content min —
+     * outside the required 55-70% band. The same mechanism defeated the previous
+     * `1.6fr 1fr` template, and `column-gap` was likewise being overridden by
+     * `gap-4` (16px) instead of the intended 8px.
+     *
+     * Bumping the selector to `.game-shell.grid` (specificity 0,2,0) makes this rule
+     * beat the Tailwind utilities regardless of source order, so the explicit
+     * two-column template below actually takes effect.
+     */
+    .game-shell.grid {
+      display: grid;
+      /*
+       * Board ~62% / stats ~38% — inside the required 55-70% band (R3.1).
+       *
+       * Fixed viewport-proportional tracks instead of `fr`. Percentage grid tracks
+       * resolve against the grid container's CONTENT box (`vw - 16px` here, after the
+       * `padding: 4px 8px`) and are independent of content intrinsic sizes and the
+       * column gap, so the ~62%/38% split holds across the whole supported landscape
+       * range (vh in [320,600], vw in (vh,1279]) rather than drifting with content or
+       * free-space distribution.
+       *
+       * Property 6 measures track[0] (used px of the FIRST column) / vw. With a 62%
+       * left track: track[0] = 0.62 * (vw - 16), so track[0]/vw = 0.62 - 9.92/vw,
+       * which lands ~0.602 (vw=568) .. ~0.612 (vw=1279) — comfortably inside
+       * [0.55, 0.70] with margin. The two tracks sum to the content box (vw - 16),
+       * so stats takes exactly the remainder with no overlap.
+       */
+      grid-template-columns: 62% 38%;
+      /* Row 1: full-width compact week header. Row 2: board | stats. Row 3: actions (left col). */
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      /* Cap the whole shell to the viewport so the layout never forces page scrolling. */
+      height: 100vh;
+      max-height: 100vh;
+      width: 100%;
+      margin: 0;
+      padding: 4px 8px;
+      gap: 4px 8px;
+      align-items: start;
+    }
+
+    /* Dissolve the LEFT wrapper so [header, board, actions] become grid items directly. */
+    .game-shell > .flex.flex-col.min-h-0 {
+      display: contents;
+    }
+
+    /* Week header — compact full-width top row spanning both columns. */
+    .game-shell > .flex.flex-col.min-h-0 > .retro-panel:first-child {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
+
+    /*
+     * Task 6.1 — Compact the week header within the viewport (Requirements: 3.2).
+     *
+     * The header is `retro-panel flex flex-wrap items-center justify-between gap-2 px-3
+     * py-2.5 sm:px-4` — on a short/wide landscape viewport its default paddings (12px inline
+     * / 10px block, 16px inline at `sm`) and 8px gaps waste the limited height and push the
+     * `ml-auto` cluster (END WEEK + restart `✕`) toward overflow. Trimming the paddings and
+     * gaps keeps the whole row — including that trailing cluster — inside the viewport with
+     * no horizontal overflow, while `flex-wrap` is preserved so items reflow rather than
+     * spill out if the row still can't fit on one line (R3.2). The full-width span set above
+     * is untouched, so the header keeps its width and stays a self-contained non-overflowing
+     * row.
+     */
+    .game-shell > .flex.flex-col.min-h-0 > .retro-panel:first-child {
+      padding: 3px 6px;
+      gap: 2px 6px;
+      font-size: 10px;
+      line-height: 1.05;
+    }
+    /*
+     * Keep the header a compact single band even on the narrowest supported
+     * landscape widths, where its items would otherwise wrap into a tall 2-line
+     * block and eat the height budget the board needs. The button padding,
+     * pixel-text label, and metric-icon chips are all trimmed so the WK / TIME /
+     * JOB cluster plus the END WEEK + restart controls fit on one compact row.
+     */
+    .game-shell > .flex.flex-col.min-h-0 > .retro-panel:first-child .retro-btn {
+      padding: 2px 5px;
+      font-size: 10px;
+    }
+    .game-shell > .flex.flex-col.min-h-0 > .retro-panel:first-child .pixel-text {
+      font-size: 8px;
+    }
+    .game-shell > .flex.flex-col.min-h-0 > .retro-panel:first-child .metric-icon {
+      min-width: 18px;
+      height: 16px;
+      font-size: 8px;
+    }
+    /* The JOB label can grow long; cap it harder in landscape so the header row
+       never wraps into a second line on the narrowest supported widths. */
+    .game-shell > .flex.flex-col.min-h-0 > .retro-panel:first-child > span:nth-child(3) {
+      max-width: 120px;
+    }
+
+    /*
+     * Board — left column, middle row (Task 3.1 — Requirements: 2.1, 2.6, 3.5).
+     *
+     * Height-driven instead of width-driven. On a short/wide landscape viewport the board
+     * must be bounded by HEIGHT, not width, so the whole square ring stays visible with no
+     * board-region vertical scrollbar (R2.1, R3.5).
+     *
+     * The `<chrome allowance>` (160px) is the left-column height budget consumed by the
+     * everything-but-board rows: the compact week header (grid-row 1), the action panel
+     * (grid-row 3), the shell's vertical padding (6px × 2), and the two 6px row gaps.
+     * Subtracting it from 100vh leaves the height the square board may occupy; the inner
+     * `min(...)` also caps the board at the middle grid track (`1fr`) so it never exceeds
+     * the space the grid actually gives it.
+     *
+     * `aspect-ratio: 1 / 1` makes width follow the resolved height — the ring stays square
+     * and `BoardRing` scales its tiles proportionally.
+     *
+     * `min-height: 0` lets the board collapse within the grid track instead of forcing the
+     * track (and the page) taller. Combined with the base `.board-window { overflow: visible }`
+     * and tiles rendering with `overflow: visible`, a transient ZERO container height during
+     * initial layout/loading does not crop any tile's icon, name, or cost (R2.6); the tiles
+     * remain fully rendered and the square sizing takes over once the height resolves.
+     */
+    .game-shell > .flex.flex-col.min-h-0 > .board-window {
+      grid-column: 1;
+      grid-row: 2;
+      /*
+       * Height-driven from the MIDDLE grid track (`1fr` with `min-height: 0`),
+       * not a hardcoded `100vh - chrome`. The shell grid's rows are
+       * `auto minmax(0,1fr) auto` (header / board / actions), so the `1fr`
+       * middle track is exactly the space left after the compact header and the
+       * actions panel within `100vh`. Constraining the board to `height: 100%`
+       * of that track (with `min-height: 0` so it can shrink) makes the board
+       * box equal to the genuinely available height — no over/under-estimated
+       * chrome constant — so board + header + actions always add up to <= 100vh
+       * with no page scroll.
+       *
+       * `aspect-ratio: 1 / 1` + `max-width: 100%` keep the ring square while
+       * letting width follow the resolved height; `margin-inline: auto` centers
+       * the square within the wider board column.
+       */
+      height: 100%;
+      width: auto;
+      max-width: 100%;
+      aspect-ratio: 1 / 1;
+      min-height: 0;
+      margin-inline: auto;
+      overflow: visible;
+    }
+
+    /*
+     * Board inner ring grid must fill the board box EXACTLY and not overflow it.
+     * The `BoardRing` renders `w-full h-full grid grid-rows-[auto_1fr_auto]`; the
+     * base rule `.board-window > div { min-height: 100% }` would let the grid
+     * grow taller than the box (its `auto` top/bottom rows plus the stacked
+     * side-column tiles have a large intrinsic height ~500px). Pinning
+     * `height: 100%; min-height: 0` forces the grid to the board box height so
+     * its `1fr` middle track absorbs the compression and the `auto` rows lay out
+     * within the box rather than spilling out via `overflow: visible`.
+     */
+    .game-shell > .flex.flex-col.min-h-0 > .board-window > div {
+      height: 100%;
+      min-height: 0;
+      overflow: visible;
+    }
+
+    /* Actions — left column, bottom row, under the board. */
+    .game-shell > .flex.flex-col.min-h-0 > .action-panel {
+      grid-column: 1;
+      grid-row: 3;
+    }
+
+    /*
+     * Stats wrapper — right column, spanning the board+actions rows so it sits beside them.
+     *
+     * Task 7.1 — Give the stats column a viewport-bounded scroll height (Requirements: 3.4).
+     *
+     * The wrapper already carries `overflow-y-auto` from the JSX, but with no height bound it
+     * grows with its content and drags the whole grid (and the page) taller instead of
+     * scrolling in place. Pinning a `max-height` tied to the viewport turns it into a bounded
+     * scroll container: the stats occupy the space beside the board and, the moment their
+     * content exceeds that bound by ANY amount (even a few pixels), `overflow-y: auto` starts
+     * scrolling WITHIN the wrapper's own bounds — there is no fixed overflow threshold (R3.4).
+     *
+     * The bound is `100vh` minus the chrome sitting outside this column's vertical band:
+     * the compact week header (grid-row 1), the shell's top+bottom padding (6px × 2 = 12px),
+     * and the row gap between the header and this row (6px). `~52px` covers the compact header
+     * row height; `12px + 6px` covers the padding and gap — `100vh - 70px` leaves the column a
+     * viewport-bounded height while the board column (a SEPARATE grid track, grid-column 1)
+     * keeps its own height-driven sizing untouched, so scrolling the stats never moves or
+     * resizes the board.
+     */
+    .game-shell > .flex.flex-col.overflow-y-auto {
+      grid-column: 2;
+      /*
+       * Place the stats column in the MIDDLE row ONLY (`grid-row: 2`, the
+       * `minmax(0, 1fr)` track), not spanning rows 2-3.
+       *
+       * R3.4 fix (board must stay FIXED while stats scroll): a `grid-row: 2 /
+       * span 2` placement made the stats item span into the `auto` row 3 (the
+       * actions row). A grid item that spans an `auto`/content-sized track
+       * contributes its own content — including its scroll content — to
+       * resolving that track's size, and that in turn feeds back into how the
+       * `minmax(0, 1fr)` middle row is distributed within `100vh`. So the moment
+       * the stats scroll state changed, row 2's height changed, and the board
+       * (which is height-driven from row 2) shifted and resized vertically
+       * (measured: board y 47.9→44.5, h 251.6→258 purely from scrolling stats).
+       *
+       * Restricting the stats item to `grid-row: 2` confines it to the
+       * `minmax(0, 1fr)` track, whose size is determined by the fixed
+       * `100vh` budget minus the `auto` header (row 1) and `auto` actions
+       * (row 3) — none of which the stats item participates in anymore. The
+       * board is height-driven from that same row 2, so its size now depends
+       * only on scroll-independent inputs. Scrolling the stats can no longer
+       * change any track height, so the board's position and size stay fixed.
+       *
+       * `min-height: 0` still lets the item shrink to the row-2 track height
+       * (rather than growing with its content), and `overflow-y: auto` then
+       * scrolls the stats WITHIN that bound the moment their content exceeds it
+       * by any amount (R3.4). `align-self: stretch` keeps the item filling the
+       * row-2 track so it has a definite bound to scroll against. The board
+       * column (grid-column 1) is a separate track and shares only the
+       * scroll-independent row 2, so scrolling stats never moves or resizes it.
+       */
+      grid-row: 2;
+      min-height: 0;
+      align-self: stretch;
+      overflow-y: auto;
+    }
+
+    /*
+     * Compress the ring's internal gaps and padding so its fixed-size (`auto`)
+     * top/bottom rows and the stacked side columns consume less height, letting
+     * the whole ring fit inside the height-driven board box. The `BoardRing`
+     * grid and every inner row container use Tailwind `gap-2` (8px) + the grid's
+     * `p-2` (8px); in landscape those are trimmed to 2px so three stacked tile
+     * rows + center + gaps fit the shortest supported board without overflow.
+     */
+    .game-shell > .flex.flex-col.min-h-0 > .board-window > div {
+      gap: 2px;
+      padding: 2px;
+    }
+    .game-shell > .flex.flex-col.min-h-0 > .board-window > div > div {
+      gap: 2px;
+    }
+
+    /*
+     * Tiles render with overflow visible (Task 3.1 — Requirements: 2.6).
+     * With the board height-driven and `min-height: 0`, the board container can momentarily
+     * collapse to zero height during initial layout/loading. Keeping the tiles' overflow
+     * visible ensures each tile's icon, name, and cost stay fully rendered rather than being
+     * clipped to a collapsed box; normal square sizing resumes once the height resolves.
+     */
+    .board-window .retro-tile {
+      overflow: visible;
+    }
+
+    /*
+     * Task 4.1 — Floor tile icon size in landscape (Requirements: 2.4).
+     *
+     * The board is height-driven on a short/wide viewport, so tiles shrink well below their
+     * 68×60 desktop / 44×42 (≤640px) sizes. Rather than pinning a fixed size, the frame gets
+     * a compact CLAMPED size that scales with the viewport but is bounded, and the icon image
+     * is FLOORED so it never renders below the 16×16 CSS-px minimum required by R2.4.
+     *
+     * Frame: clamp(20px, 5vh, 28px) — tracks the compact board height, capped at 28px so the
+     * frame stays smaller than the desktop/portrait frames while leaving room for the icon.
+     * Image: min ≥16px via clamp(16px, 4.2vh, 24px) — design target ~24px, hard floor 16px,
+     * so the icon is always at least 16×16 CSS px across the whole landscape viewport range.
+     */
+    .location-icon-frame {
+      width: clamp(16px, 2.6vh, 22px);
+      height: clamp(16px, 2.6vh, 20px);
+    }
+    .location-icon-frame img {
+      width: clamp(16px, 2.6vh, 20px);
+      height: clamp(16px, 2.6vh, 20px);
+    }
+
+    /*
+     * Task 4.3 — Floor tile text size and prevent label clipping
+     * (Requirements: 2.3, 2.2).
+     *
+     * On a short/wide landscape viewport the height-driven board shrinks the tiles, which
+     * would otherwise drag the name label (`text-[7px]`, ~7px) and the movement-cost text
+     * below a legible size. R2.3 requires every tile's text to compute to ≥10 CSS px, so the
+     * tile's DIRECT-CHILD text spans get `font-size: max(10px, …)`: the `max()` guarantees the
+     * computed size never drops below the 10px floor while still allowing a slightly larger,
+     * viewport-tracking size on the taller end of the landscape range.
+     *
+     * The selector targets only the tile's own text — the icon frame (`.location-icon-frame`)
+     * and the hover popover (`.location-popover`, which is a direct-child span too) are
+     * explicitly excluded so this rule touches just the name label, the movement cost, and the
+     * "HERE" marker.
+     *
+     * Label clipping (R2.2): the name span carries `sm:whitespace-nowrap`, which re-enables
+     * `white-space: nowrap` at ≥640px — and a landscape phone can be ≥640px wide, so the name
+     * could be forced onto one line and clip horizontally inside the shrunken tile. Forcing
+     * `white-space: normal` (equivalent to the base `whitespace-normal`) here lets the label
+     * wrap within the tile instead of clipping, and `overflow-wrap: anywhere` guards long
+     * single words. `max-width: none` removes the `max-w-[72px]`/`sm:max-w-[132px]` cap so the
+     * wrapped label uses the full tile width rather than being squeezed.
+     */
+    .board-window .retro-tile > span:not(.location-icon-frame):not(.location-popover) {
+      font-size: max(10px, 1.4vh);
+      line-height: 1.02;
+      margin-top: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      max-width: none;
+    }
+
+    /*
+     * Strip the tile's internal vertical margins (the JSX uses `mt-1` / `mt-0.5`
+     * between the icon, name, and cost) so the icon + name + cost stack as
+     * tightly as the 10px text floor and 16px icon floor allow, keeping each
+     * tile's own intrinsic content height small. The 44px tap-target floor is
+     * still guaranteed by `min-height: 44px` on `.retro-tile` below.
+     */
+    .board-window .retro-tile > .location-icon-frame {
+      margin: 0;
+    }
+
+    /*
+     * Task 4.5 — Floor tile tap targets to 44×44 (Requirements: 2.5).
+     *
+     * The board is height-driven on a short/wide landscape viewport, so the visual tile
+     * content (icon frame + floored text) shrinks. The *interactive* target must still meet
+     * the 44×44 CSS-px minimum required by R2.5, independent of how dense the visual content
+     * becomes. Pinning `min-width`/`min-height: 44px` on each tile guarantees the touch area
+     * never falls below 44×44 even when the ring shrinks. Padding is trimmed to keep tiles
+     * compact, but only as far as the 44px floor allows — the `min-*` values hold the target
+     * size regardless of the reduced padding.
+     */
+    /*
+     * The tile's 44×44 touch target is provided WITHOUT inflating the ring's
+     * intrinsic layout height. A hard `min-height: 44px` on the layout box would
+     * force three stacked side-column tiles to a ~132px+ floor in the middle
+     * grid track, which — added to the top/bottom rows and center — cannot fit
+     * the shortest supported height-driven board, so the ring would overflow the
+     * board box and spill outside the viewport (the exact defect being fixed).
+     *
+     * Instead the tile is allowed to size to its content (icon + wrapped name +
+     * cost), which at the supported landscape sizes is already comfortably ≥44px
+     * tall — while an `::after` overlay expands the interactive area to at least
+     * 44×44 CSS px even if the visual box ever renders smaller on an extreme
+     * short viewport. The overlay is `position: absolute` with a symmetric
+     * minimum extent centered on the tile, so it grows the HIT AREA, never the
+     * layout box; it therefore never re-inflates the ring's intrinsic height.
+     *
+     * Padding and inter-child gap are trimmed to keep the content box compact so
+     * the ring fits, and `gap: 0` removes the flex row-gap between icon/name/cost.
+     */
+    .board-window .retro-tile {
+      min-width: 0;
+      min-height: 0;
+      padding: 2px;
+      gap: 0;
+      position: relative;
+    }
+
+    /*
+     * Touch-target floor as a non-layout overlay: at least 44×44 CSS px, centered
+     * on the tile, expanding symmetrically beyond the visual box when the tile is
+     * smaller than 44px without affecting the ring's layout height (R2.5, R3.3).
+     * `min-width/min-height: 44px` on the pseudo-element sizes the hit area to 44
+     * where the tile is smaller; on larger tiles the `inset: 0` keeps it matching
+     * the tile. It sits above the tile content for pointer hits but is transparent.
+     */
+    .board-window .retro-tile::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      min-width: 44px;
+      min-height: 44px;
+      z-index: 1;
+    }
+
+    /*
+     * Side-column tiles (left/right of the ring) are `auto`-width, so on a short
+     * viewport their location names would wrap character-by-character into a tall
+     * 4-5 line stack — inflating each tile and blowing the middle grid track
+     * (three stacked tiles) past the board box. A modest `min-width` lets each
+     * name word sit on its own line (≤2-3 lines) instead of shattering, keeping
+     * side tiles short so three stacked ones fit the height-driven board. The
+     * name is never cropped (R2.2) — it still wraps and stays fully visible, just
+     * on fewer, wider lines. Left column = ring grid's 2nd child, right = 4th.
+     */
+    .board-window > div > .row-span-1.flex.flex-col .retro-tile {
+      min-width: 92px;
+    }
+
+    /*
+     * Let the ring's middle grid track and the side-column flex containers
+     * actually compress. `grid-rows-[auto_1fr_auto]` treats `1fr` as
+     * `minmax(auto,1fr)` by default, so the side columns' min-content height
+     * (three stacked tiles) forces the track — and the ring — taller than the
+     * board box. Forcing `min-height: 0` on the side/center flex containers lets
+     * the middle track shrink to the space the board actually has; combined with
+     * the compact tile content below (icon+name+cost floored at the 16px/10px
+     * minimums), three stacked tiles fit the shortest supported board instead of
+     * overflowing it.
+     */
+    .board-window > div > .row-span-1 {
+      min-height: 0;
+    }
+
+    /*
+     * Task 6.3 — Fit action controls in the left column with floored tap targets
+     * (Requirements: 3.3).
+     *
+     * `ActionButton` renders as a `<button class="flex-1 min-w-[160px] p-3 … retro-panel …">`
+     * inside `.action-panel`'s `flex flex-wrap gap-2` row. In the compact landscape left
+     * column (grid-column 1, grid-row 3) sitting under a height-driven board, the fixed
+     * `min-w-[160px]` is too wide to wrap cleanly — two buttons at 160px + gap overflow the
+     * narrower column, pushing controls out of view. Relaxing the min-width lets the buttons
+     * reflow within the column while `min-width`/`min-height: 44px` floors keep every control
+     * at a ≥44×44 CSS-px touch target (R3.3). Trimmed padding keeps the controls compact
+     * without dropping below the 44px floor, which the `min-*` values hold regardless.
+     */
+    .action-panel button {
+      /* Relax the 160px min so buttons wrap in the narrow column, but never below the
+         44px touch-target floor. */
+      min-width: 44px;
+      min-height: 44px;
+      padding: 6px 8px;
+    }
+
+    /*
+     * Compact the action panel and bound its height so it does not eat the
+     * left-column height budget the board needs. On a short landscape viewport
+     * the wrapped action buttons can stack into a tall block (grid-row 3) that
+     * squeezes the board's `1fr` middle track — starving the ring of the height
+     * it needs to fit and forcing page overflow. Trimming the panel's padding
+     * and heading, and capping it with a viewport-proportional `max-height` plus
+     * `overflow-y: auto`, keeps the actions reachable (they scroll within their
+     * own bounds) while leaving the board enough room to fit fully (R2.1, R3.3).
+     */
+    .game-shell > .flex.flex-col.min-h-0 > .action-panel {
+      padding: 4px 6px;
+      max-height: 28vh;
+      overflow-y: auto;
+    }
+    .game-shell > .flex.flex-col.min-h-0 > .action-panel > h3 {
+      margin-bottom: 2px;
+    }
+
+    /*
+     * Task 8.1 — Bound the dialog panel to the viewport in landscape (Requirements: 5.5).
+     *
+     * `GameDialog` renders as a `fixed inset-0` centered flex overlay (`p-4`) with the
+     * `.game-dialog` panel as its child. On a short landscape viewport a tall dialog could
+     * exceed the height and force page scrolling to reach its controls. Capping the panel at
+     * `calc(100vh - 1rem)` keeps it within the viewport (the `- 1rem` preserves a small margin
+     * around the overlay padding), and making its inner content region (`.game-dialog > div`,
+     * the bordered content box holding the title, body, and action buttons) `overflow-y: auto`
+     * lets that content scroll WITHIN the capped panel so every control stays reachable with
+     * no page scroll (R5.5). Centering (parent flex overlay) and the backdrop are unchanged.
+     */
+    .game-dialog {
+      max-height: calc(100vh - 1rem);
+    }
+    .game-dialog > div {
+      max-height: inherit;
+      overflow-y: auto;
+    }
+
+    /*
+     * Task 9.1 — CSS-first directional popover placement and size caps (Requirements: 5.6).
+     *
+     * Popovers are given static directional classes at render time in `BoardRing`:
+     *   - Left column  → `popover-right` (opens rightward toward the ring center)
+     *   - Right column → `popover-left`  (opens leftward toward the ring center)
+     *   - Left-column `market` tile → `popover-up`
+     *   - Top and bottom row tiles → NO directional class, so the base `.location-popover`
+     *     rule places them `top-full` (downward, below the tile).
+     *
+     * On a short/wide landscape viewport the ring's bottom row sits near the bottom edge, so a
+     * downward (`top-full`) popover there would overflow below the viewport. This block flips
+     * the default placement per row so the popover always opens toward the ring interior:
+     *
+     *   - BOTTOM-ROW tiles open UPWARD (popover above the tile). The bottom row is the LAST
+     *     `.col-span-3` grid child of the ring; its tiles carry no directional class, so we
+     *     retarget their `.location-popover` from `top-full` to `bottom-full`.
+     *   - TOP-ROW tiles keep opening DOWNWARD — that is already the base `top-full` behavior,
+     *     asserted here explicitly for clarity (top row is the FIRST `.col-span-3` child).
+     *   - SIDE COLUMNS keep their left/right placement (handled by the base `popover-right` /
+     *     `popover-left` rules; unchanged here).
+     *
+     * The `.board-window > div` is the ring grid; its direct `.col-span-3` children are the
+     * top row (first) and bottom row (last). Targeting `.retro-tile` inside those rows lets us
+     * flip only the row that needs it without any JSX change.
+     *
+     * Size caps: constrain every popover's `max-width`/`max-height` to the viewport (minus a
+     * small margin) so a popover can never exceed screen bounds on a short viewport, keeping
+     * default placement inside the viewport for the ring geometry (R5.6, R5.7). Placement is
+     * CSS-only — the directional flips above plus these caps keep popovers on-screen at all
+     * supported landscape sizes with no JS repositioning.
+     */
+
+    /* Bottom-row tiles: open the popover UPWARD (above the tile) instead of downward. */
+    .board-window > div > .col-span-3:last-child .tile-wrap .location-popover {
+      top: auto;
+      bottom: 100%;
+      margin-top: 0;
+      margin-bottom: .5rem;
+    }
+
+    /* Top-row tiles: keep opening DOWNWARD (base `top-full`), stated explicitly. */
+    .board-window > div > .col-span-3:first-child .tile-wrap .location-popover {
+      top: 100%;
+      bottom: auto;
+      margin-top: .5rem;
+      margin-bottom: 0;
+    }
+
+    /* Constrain every popover to the viewport so it never exceeds screen bounds (R5.6). */
+    .location-popover {
+      max-width: calc(100vw - 1rem);
+      max-height: calc(100vh - 1rem);
+      overflow-y: auto;
+    }
+  }
+
+  /*
+   * Tile wrapper: carries the directional `popover-*` classes so DISABLED tiles (HERE /
+   * unreachable) still open their popover on hover — CSS keys the open state off
+   * `.tile-wrap:hover`/`:focus-within`, which matches even for disabled buttons.
+   *
+   * `display: contents` makes the wrapper generate NO box of its own: the inner `.retro-tile`
+   * button is promoted to be the direct grid/flex item of the ring, so the ring layout, board
+   * fit, and tap-target geometry are byte-for-byte identical to having no wrapper. The wrapper
+   * still exists in the DOM (so its `:hover` matches when the button is hovered), and the
+   * popover's positioning context remains the `.retro-tile` button (which is `position:
+   * relative`), so directional placement is unchanged.
+   */
+  .tile-wrap {
+    display: contents;
   }
 
   /* Retro tile hover glow */
