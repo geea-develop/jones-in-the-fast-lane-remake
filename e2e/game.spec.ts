@@ -20,10 +20,13 @@ test.describe("Jones in the Fast Lane", () => {
   test("requires confirmation before performing a location action", async ({ page }) => {
     await page.getByRole("button", { name: /START GAME/ }).click();
 
-    await page.getByRole("button", { name: "Rest action" }).click();
+    // Rest is disabled at full energy on a fresh game, so travel to Z-Mart and
+    // buy food (food starts below max, so the action is enabled).
+    await page.getByRole("button", { name: /Z-Mart/ }).click();
+    await page.getByRole("button", { name: "Buy Food ($15) action" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText("REST");
+    await expect(dialog).toContainText("BUY FOOD");
     await expect(dialog).toContainText("TIME");
     await expect(dialog).toContainText("CASH");
 
