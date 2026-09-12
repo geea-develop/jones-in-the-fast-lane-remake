@@ -109,3 +109,60 @@ test("checkWin honours the selected goals only", () => {
   game!.player.money = 0;
   assert.equal(checkWin(game!, game!.player), true);
 });
+
+test("hard difficulty: running out of food is fatal", () => {
+  const { game } = createGame({
+    playerName: "Ada",
+    goalSelection: { money: true, education: true, career: true, happiness: true, difficulty: "hard" },
+  });
+  assert.ok(game);
+
+  // Starve the player, keep energy up so exhaustion isn't the cause.
+  game!.player.food = 0;
+  game!.player.energy = 100;
+
+  const { events } = endWeek(game!);
+
+  assert.equal(game!.status, "lost", "player should die from starvation on hard");
+  assert.ok(events.some((e) => e.type === "death"), "should emit a death event");
+  assert.ok(game!.lastEvent?.includes("starvation"), "cause should be starvation");
+  // Death ends the week immediately — the week must NOT advance.
+  assert.equal(game!.week, 1, "week should not advance after death");
+});
+
+test("hard difficulty: running out of energy is fatal", () => {
+  const { game } = createGame({
+    playerName: "Ada",
+    goalSelection: { money: true, education: true, career: true, happiness: true, difficulty: "hard" },
+  });
+  assert.ok(game);
+
+  // Keep food up so starvation isn't the cause; drain energy (decay of 8 will
+  // still leave it at 0 after Math.max clamp).
+  game!.player.food = 100;
+  game!.player.energy = 0;
+
+  const { events } = endWeek(game!);
+
+  assert.equal(game!.status, "lost", "player should die from exhaustion on hard");
+  assert.ok(events.some((e) => e.type === "death"), "should emit a death event");
+  assert.ok(game!.lastEvent?.includes("exhaustion"), "cause should be exhaustion");
+});
+
+test("easy/medium difficulty: zero food is survivable (no death)", () => {
+  for (const difficulty of ["easy", "medium"] as const) {
+    const { game } = createGame({
+      playerName: "Ada",
+      goalSelection: { money: true, education: true, career: true, happiness: true, difficulty },
+    });
+    assert.ok(game);
+
+    game!.player.food = 0;
+    game!.player.energy = 0;
+
+    endWeek(game!);
+
+    assert.equal(game!.status, "in_progress", `${difficulty} should not kill the player at 0 food/energy`);
+    assert.equal(game!.week, 2, `${difficulty} week should still advance`);
+  }
+});

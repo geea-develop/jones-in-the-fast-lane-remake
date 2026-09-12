@@ -29,6 +29,8 @@ export function createPlayer(id: string, name: string): Player {
     position: "home",
     job: null,
     turnsEmployed: 0,
+    bankBalance: 0,
+    rentPaidThisWeek: false,
   };
 }
 

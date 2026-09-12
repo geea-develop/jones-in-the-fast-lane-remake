@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost, GameEvent } from "@jones/shared";
+import { GameState, LOCATIONS, ACTIONS, LocationId, ActionId, getMovementCost, GameEvent, FOOD_DECAY_PER_WEEK, ENERGY_DECAY_PER_WEEK, WORK_MIN_ENERGY, BANK_TRANSFER_AMOUNT } from "@jones/shared";
 import { moveToLocation, performAction, endWeek } from "@/lib/api";
 import { LocationIcon } from "./LocationIcons";
 import { assetPath } from "@/lib/assets";
@@ -40,6 +40,30 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
     () => currentLocation ? ACTIONS.filter((a) => currentLocation.actions.includes(a.id)) : [],
     [currentLocation]
   );
+
+  // On hard, ending the week is fatal if food or energy would hit 0 after the
+  // week's decay. Warn the player while there's still time to eat / rest.
+  const deathRisk = useMemo(() => {
+    if (game.goalSelection?.difficulty !== "hard" || game.status !== "in_progress") return null;
+    const foodFatal = game.player.food - FOOD_DECAY_PER_WEEK <= 0;
+    const energyFatal = game.player.energy - ENERGY_DECAY_PER_WEEK <= 0;
+    if (!foodFatal && !energyFatal) return null;
+    if (foodFatal && energyFatal) return "starvation and exhaustion";
+    return foodFatal ? "starvation" : "exhaustion";
+  }, [game.goalSelection?.difficulty, game.status, game.player.food, game.player.energy]);
+
+  // On easy/medium there's no death, but running out of food/energy still hurts
+  // (starvation penalty, risk of being fired). Warn when a vital is about to run
+  // out after this week's decay. Skipped on hard, which shows deathRisk instead.
+  const lowVitals = useMemo(() => {
+    if (game.goalSelection?.difficulty === "hard" || game.status !== "in_progress") return null;
+    const foodLow = game.player.food - FOOD_DECAY_PER_WEEK <= 0;
+    const energyLow = game.player.energy - ENERGY_DECAY_PER_WEEK <= 0;
+    const running: string[] = [];
+    if (foodLow) running.push("food");
+    if (energyLow) running.push("energy");
+    return running.length ? running.join(" and ") : null;
+  }, [game.goalSelection?.difficulty, game.status, game.player.food, game.player.energy]);
 
   const handleMove = useCallback(async (locationId: LocationId) => {
     if (isSubmitting) return;
@@ -118,12 +142,13 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
               onClick={handleEndWeek}
               disabled={isSubmitting}
               className={`retro-btn ${
-                confirmEndWeek
+                confirmEndWeek || deathRisk
                   ? "bg-red-700 hover:bg-red-800 animate-pulse"
                   : "bg-amber-700 hover:bg-amber-800"
               }`}
+              title={deathRisk ? `Warning: ending the week now kills you from ${deathRisk}` : undefined}
             >
-              {confirmEndWeek ? "CONFIRM?" : "END WEEK →"}
+              {confirmEndWeek ? "CONFIRM?" : deathRisk ? "END WEEK 💀" : "END WEEK →"}
             </button>
             <button
               onClick={onRestart}
@@ -160,6 +185,13 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
                 action={action}
                 timeUnits={game.player.timeUnits}
                 money={game.player.money}
+                hasJob={!!game.player.job}
+                energy={game.player.energy}
+                food={game.player.food}
+                education={game.player.education}
+                happiness={game.player.happiness}
+                bankBalance={game.player.bankBalance}
+                rentPaidThisWeek={game.player.rentPaidThisWeek}
                 onAction={(id) => setPendingAction(id)}
                 disabled={isSubmitting}
               />
@@ -187,10 +219,28 @@ export default function GameBoard({ game, onUpdate, onMessage, onRestart }: Game
         {/* Player vitals */}
         <div className="retro-panel hud-panel p-3">
           <h3 className="pixel-text text-[8px] text-green-400 mb-2">VITALS</h3>
+          <div className="flex items-center justify-between mb-2 text-[11px] font-mono">
+            <span className="text-amber-300">💰 ${game.player.money}</span>
+            <span className="text-emerald-300" title="Safe from muggers">🏦 ${game.player.bankBalance}</span>
+          </div>
           <div className="space-y-2">
             <StatBar icon="⚡" label="Energy" value={game.player.energy} warn={20} />
             <StatBar icon="FOOD" label="Food" value={game.player.food} warn={25} />
           </div>
+          {deathRisk && (
+            <div className="mt-2 border-2 border-red-500 bg-red-900/40 p-2 animate-pulse">
+              <p className="pixel-text text-[8px] text-red-300 leading-relaxed">
+                💀 DANGER: ending this week will kill you from {deathRisk}. Eat and/or rest first!
+              </p>
+            </div>
+          )}
+          {lowVitals && (
+            <div className="mt-2 border-2 border-amber-500 bg-amber-900/40 p-2">
+              <p className="pixel-text text-[8px] text-amber-300 leading-relaxed">
+                ⚠️ LOW: your {lowVitals} will run out this week. Eat and/or rest to avoid penalties.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Jones tracker */}
@@ -306,16 +356,58 @@ const ACTION_CATEGORIES: Record<string, { emoji: string; color: string }> = {
   withdraw: { emoji: "🏦", color: "border-red-500/60 hover:border-red-400" },
 };
 
-const ActionButton = memo(function ActionButton({ action, timeUnits, money, onAction, disabled: isSubmitting }: {
+const ActionButton = memo(function ActionButton({ action, timeUnits, money, hasJob, energy, food, education, happiness, bankBalance, rentPaidThisWeek, onAction, disabled: isSubmitting }: {
   action: typeof ACTIONS[0];
   timeUnits: number;
   money: number;
+  hasJob: boolean;
+  energy: number;
+  food: number;
+  education: number;
+  happiness: number;
+  bankBalance: number;
+  rentPaidThisWeek: boolean;
   onAction: (id: ActionId) => void;
   disabled: boolean;
 }) {
   const canAffordTime = timeUnits >= action.timeCost;
   const canAffordMoney = !action.moneyCost || money >= action.moneyCost;
-  const disabled = isSubmitting || !canAffordTime || !canAffordMoney;
+
+  // Reason this action would have no useful effect right now (maxed stat, no job,
+  // too tired). Used to disable the button and explain why. Mirrors engine rules.
+  let blockReason: string | null = null;
+  switch (action.id) {
+    case "work":
+      if (!hasJob) blockReason = "You need a job first — visit ACNE Employment to get hired.";
+      else if (energy < WORK_MIN_ENERGY) blockReason = "Too tired to work — rest to recover energy first.";
+      break;
+    case "rest":
+      if (energy >= 100) blockReason = "Energy is already full.";
+      break;
+    case "buy_food":
+      if (food >= 100) blockReason = "You're already well fed (food is full).";
+      break;
+    case "study":
+      if (education >= 100) blockReason = "Education is already maxed out.";
+      break;
+    case "buy_item":
+    case "buy_clothes":
+    case "buy_electronics":
+    case "have_fun":
+      if (happiness >= 100) blockReason = "Happiness is already full.";
+      break;
+    case "pay_rent":
+      if (rentPaidThisWeek) blockReason = "Rent is already paid for this week.";
+      break;
+    case "deposit":
+      if (money < BANK_TRANSFER_AMOUNT) blockReason = `Need at least $${BANK_TRANSFER_AMOUNT} in cash to deposit.`;
+      break;
+    case "withdraw":
+      if (bankBalance <= 0) blockReason = "Your bank account is empty.";
+      break;
+  }
+
+  const disabled = isSubmitting || !canAffordTime || !canAffordMoney || !!blockReason;
   const cat = ACTION_CATEGORIES[action.id] || { emoji: "▶", color: "border-gray-500/60 hover:border-gray-400" };
 
   return (
@@ -323,6 +415,7 @@ const ActionButton = memo(function ActionButton({ action, timeUnits, money, onAc
       onClick={() => onAction(action.id)}
       disabled={disabled}
       aria-label={`${action.name} action`}
+      title={blockReason ?? undefined}
       className={`flex-1 min-w-[160px] p-3 rounded-lg retro-panel border-2 text-left transition-all
         disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-100
         hover:scale-[1.02] active:scale-[0.98] ${cat.color}`}
@@ -335,7 +428,9 @@ const ActionButton = memo(function ActionButton({ action, timeUnits, money, onAc
         <span className="text-[10px] text-cyan-300 font-mono font-bold">⏱ {action.timeCost}h</span>
         {action.moneyCost ? <span className="text-[10px] text-amber-300 font-mono font-bold">💰 ${action.moneyCost}</span> : null}
       </div>
-      <span className="text-[10px] text-gray-500 block mt-1">{action.description}</span>
+      <span className="text-[10px] text-gray-500 block mt-1">
+        {blockReason ?? action.description}
+      </span>
     </button>
   );
 });
