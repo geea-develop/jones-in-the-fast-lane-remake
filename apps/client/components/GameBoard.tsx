@@ -483,7 +483,7 @@ const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMov
       </div>
 
       {/* Center — player vs jones portraits */}
-      <div className="row-span-1 flex items-center justify-center">
+      <div className="row-span-1 flex min-h-0 items-center justify-center overflow-hidden">
         <CenterStats player={player} goals={goals} />
       </div>
 
@@ -510,24 +510,24 @@ const BoardRing = memo(function BoardRing({ playerPosition, jonesPosition, onMov
 
 const CenterStats = memo(function CenterStats({ player }: { player: GameState["player"]; goals: GameState["goals"] }) {
   return (
-    <div className="retro-panel flex min-w-0 flex-col items-center gap-1 p-2 sm:min-w-[200px] sm:gap-3 sm:p-4">
+    <div className="retro-panel flex max-h-full min-w-0 flex-col items-center gap-0.5 overflow-hidden p-1.5 sm:min-w-[200px] sm:gap-3 sm:p-4">
       {/* Character portrait */}
-      <div className="flex items-end gap-1 sm:gap-4">
+      <div className="flex min-h-0 shrink items-end gap-1 sm:gap-4">
         <div className="flex flex-col items-center">
           <img
             src={assetPath("assets/characters/player.png")}
             alt="Player"
-            className="h-16 w-10 object-contain drop-shadow-[0_0_6px_rgba(0,255,255,0.5)] sm:h-24 sm:w-14"
+            className="h-10 w-6 shrink object-contain drop-shadow-[0_0_6px_rgba(0,255,255,0.5)] sm:h-24 sm:w-14"
             style={{ imageRendering: "pixelated" }}
           />
           <span className="pixel-text text-[7px] text-cyan-400 mt-1">YOU</span>
         </div>
-        <span className="pixel-text text-[8px] text-gray-500 pb-6">VS</span>
+        <span className="pixel-text text-[8px] text-gray-500 pb-4 sm:pb-6">VS</span>
         <div className="flex flex-col items-center">
           <img
             src={assetPath("assets/characters/jones.png")}
             alt="Jones"
-            className="h-16 w-10 object-contain drop-shadow-[0_0_6px_rgba(255,0,0,0.5)] sm:h-24 sm:w-14"
+            className="h-10 w-6 shrink object-contain drop-shadow-[0_0_6px_rgba(255,0,0,0.5)] sm:h-24 sm:w-14"
             style={{ imageRendering: "pixelated" }}
           />
           <span className="pixel-text text-[7px] text-red-400 mt-1">JONES</span>
@@ -535,7 +535,7 @@ const CenterStats = memo(function CenterStats({ player }: { player: GameState["p
       </div>
 
       {/* Key vitals - compact */}
-      <div className="grid w-full grid-cols-2 gap-x-2 gap-y-1 text-[8px] font-mono sm:gap-x-4 sm:text-[10px]">
+      <div className="grid w-full shrink-0 grid-cols-2 gap-x-2 gap-y-0.5 text-[8px] font-mono sm:gap-x-4 sm:gap-y-1 sm:text-[10px]">
         <span className={player.energy <= 20 ? "text-red-400 animate-pulse" : "text-green-300"}>⚡ {player.energy}</span>
         <span className="text-amber-300 text-right">💰 ${player.money}</span>
         <span className={player.food <= 25 ? "text-red-400 animate-pulse" : "text-green-300"}>🍔 {player.food}</span>
