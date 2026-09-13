@@ -2,6 +2,10 @@
 
 A modern web-based remake of the classic 1991 Sierra DOS game "Jones in the Fast Lane". Race against AI opponent Jones to achieve life goals (money, education, career, happiness) by navigating a ring-shaped board of locations.
 
+## 🎮 Live Demo
+
+Play now at **[geea-develop.github.io/jones-in-the-fast-lane-remake](https://geea-develop.github.io/jones-in-the-fast-lane-remake/)**
+
 ## Play
 
 ```bash
